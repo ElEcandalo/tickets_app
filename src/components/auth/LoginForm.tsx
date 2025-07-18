@@ -7,11 +7,11 @@ import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 
 export default function LoginForm() {
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({ mode: 'onTouched' });
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<{ email: string; password: string }>({ mode: 'onTouched' });
   const [serverError, setServerError] = useState('');
   const router = useRouter();
 
-  const onSubmit = async (data: any) => {
+  const onSubmit = async (data: { email: string; password: string }) => {
     setServerError('');
     const { email, password } = data;
     try {
@@ -42,6 +42,7 @@ export default function LoginForm() {
         }
       }
     } catch (err) {
+      console.error('Error during login:', err);
       setServerError('Error inesperado durante el login');
     }
   };

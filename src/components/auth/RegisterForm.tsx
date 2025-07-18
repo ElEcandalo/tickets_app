@@ -7,14 +7,14 @@ import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 
 export default function RegisterForm() {
-  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm({
+  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<{ email: string; password: string; confirmPassword: string }>({
     mode: 'onTouched',
   });
   const [serverError, setServerError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
-  const router = useRouter();
+  // const router = useRouter(); // No se usa actualmente
 
-  const onSubmit = async (data: any) => {
+  const onSubmit = async (data: { email: string; password: string; confirmPassword: string }) => {
     setServerError('');
     setSuccessMessage('');
     const { email, password, confirmPassword } = data;
@@ -57,10 +57,12 @@ export default function RegisterForm() {
             setServerError('Error en el proceso de registro. Por favor, intenta de nuevo.');
           }
         } catch (profileErr) {
+          console.error('Error creating profile:', profileErr);
           setServerError('Error en el proceso de registro. Por favor, intenta de nuevo.');
         }
       }
     } catch (err) {
+      console.error('Error during registration:', err);
       setServerError('Error inesperado durante el registro');
     }
   };

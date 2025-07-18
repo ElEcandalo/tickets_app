@@ -62,7 +62,7 @@ export default function InvitadoModal({ isOpen, onClose, invitado, onSuccess, fu
   const sendInvitationEmail = async (
     invitadoData: InvitadoWithRelations,
     funcionData: { nombre: string; capacidad_total: number; precio_entrada: number },
-    tickets: any[]
+    tickets: Array<{ id: string; qr_image_url?: string; qr_link?: string }>
   ) => {
     try {
       // Obtener información de la función (fecha y lugar)
@@ -77,7 +77,7 @@ export default function InvitadoModal({ isOpen, onClose, invitado, onSuccess, fu
       }
 
       // Preparar los QR codes para el email
-      const qrCodes = tickets.map((ticket, index) => ({
+      const qrCodes = tickets.map((ticket) => ({
         imageUrl: ticket.qr_image_url || null,
         link: ticket.qr_link || `https://tickets-app-git-main-elecandalos-projects.vercel.app/ticket/${ticket.id}`
       }));

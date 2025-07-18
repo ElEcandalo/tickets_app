@@ -271,7 +271,7 @@ export default function InvitadosList({ funcionId: propFuncionId, showStats = tr
       }
 
       // Preparar los QR codes para el email
-      const qrCodes = tickets.map((ticket, index) => ({
+      const qrCodes = tickets.map((ticket) => ({
         imageUrl: ticket.qr_image_url || null,
         link: ticket.qr_link || `https://tickets-app-git-main-elecandalos-projects.vercel.app/ticket/${ticket.id}`
       }));

@@ -5,6 +5,11 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(req: NextRequest) {
   try {
+    // Verificar que la API key esté configurada
+    if (!process.env.RESEND_API_KEY) {
+      return NextResponse.json({ error: 'API key de Resend no configurada' }, { status: 500 });
+    }
+
     const { to, nombreInvitado, obra, fecha, lugar, qrCodes } = await req.json();
     // qrCodes: array de objetos { imageUrl: string, link: string }
 
@@ -41,7 +46,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
     return NextResponse.json({ success: true, data });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Error inesperado' }, { status: 500 });
-  }
+      } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Error inesperado';
+      return NextResponse.json({ error: errorMessage }, { status: 500 });
+    }
 } 
