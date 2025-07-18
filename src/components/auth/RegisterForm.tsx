@@ -54,8 +54,7 @@ export default function RegisterForm() {
             'create_user_profile',
             {
               user_id: data.user.id,
-              user_email: data.user.email || email,
-              user_role: 'colaborador', // Forzar rol colaborador
+              user_email: data.user.email || email
             }
           );
 
