@@ -44,6 +44,7 @@ export default function UsuariosAdminPage() {
       setUsuarios(data || []);
     } catch (err) {
       setError("Error inesperado al cargar usuarios");
+      console.error(err);
     } finally {
       setFetching(false);
     }
@@ -62,6 +63,7 @@ export default function UsuariosAdminPage() {
       setUsuarios((prev) => prev.filter((u) => u.id !== id));
     } catch (err) {
       setError("Error inesperado al eliminar usuario");
+      console.error(err);
     } finally {
       setActionLoading(null);
     }
@@ -84,6 +86,7 @@ export default function UsuariosAdminPage() {
       );
     } catch (err) {
       setError("Error inesperado al cambiar rol");
+      console.error(err);
     } finally {
       setActionLoading(null);
     }

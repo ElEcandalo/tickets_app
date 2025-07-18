@@ -6,6 +6,7 @@ import { InvitadoWithRelations } from '@/types/invitados';
 import FuncionSelector from '../funciones/FuncionSelector';
 import { z } from 'zod';
 import { TicketService } from '@/services/ticketService';
+import type { Invitado } from '@/types/invitados';
 
 // Esquema de validación para Invitado
 const invitadoSchema = z.object({
@@ -252,7 +253,7 @@ export default function InvitadoModal({ isOpen, onClose, invitado, onSuccess, fu
       if (invitadoData.funcion_id === '') invitadoData.funcion_id = null;
 
       // Filtrar solo los campos válidos para la tabla 'invitados'
-      const invitadoPayload: any = {
+      const invitadoPayload: Omit<Invitado, 'id'> & Partial<Pick<Invitado, 'id'>> = {
         funcion_id: invitadoData.funcion_id,
         colaborador_id: invitadoData.colaborador_id,
         nombre: invitadoData.nombre,
