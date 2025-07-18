@@ -1,36 +1,64 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# App de Gestión de Teatro - Contexto General
 
-## Getting Started
+## Objetivo
+Crear una aplicación interna para administrar funciones teatrales, venta de entradas y gestión de invitados, con control de acceso para diferentes tipos de usuarios.
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Usuarios
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- **Administradores**
+  - Pueden crear y modificar funciones (obras).
+  - Venden entradas.
+  - Gestionan datos completos.
+  - Acceso total a todas las obras y datos.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Colaboradores**
+  - Asignados a una o varias obras específicas.
+  - Solo pueden gestionar invitados y funciones relacionadas con esas obras.
+  - Envían mails a invitados y pueden escanear códigos QR en la puerta.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## Funcionalidades principales
 
-To learn more about Next.js, take a look at the following resources:
+1. **Gestión de funciones (obras)**
+   - Crear, editar y listar funciones.
+   - Cada función incluye datos como nombre, fecha, y ubicación.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+2. **Venta de entradas**
+   - Generar entradas con código QR único para cada invitado.
+   - Control de stock y conteo de entradas vendidas por función.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+3. **Gestión de invitados**
+   - Registrar invitados vinculados a funciones.
+   - Guardar datos de contacto.
+   - Enviar entradas por correo electrónico usando la API de Resend.
 
-## Deploy on Vercel
+4. **Escaneo de códigos QR**
+   - Validar entradas en la puerta.
+   - Marcar entradas como usadas para evitar duplicados.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+5. **Control de permisos**
+   - Roles definidos (admin y colaborador).
+   - Acceso restringido según rol y función asignada.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+6. **Base de datos**
+   - Usar Supabase para almacenar funciones, entradas, usuarios y permisos.
+
+---
+
+## Tecnologías propuestas
+
+- Frontend: Next.js (App Router, React)
+- Backend & Base de datos: Supabase (PostgreSQL + Auth)
+- Envío de mails: Resend API
+- Generación y lectura de códigos QR: librerías especializadas
+
+---
+
+## Notas adicionales
+
+- Aplicación interna, no pública.
+- Enfocada en usabilidad para equipo de gestión y control en puerta.
+- Diseño escalable para agregar futuros roles o funcionalidades.
