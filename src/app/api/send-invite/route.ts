@@ -7,8 +7,11 @@ export async function POST(req: NextRequest) {
   try {
     // Verificar que la API key esté configurada
     if (!process.env.RESEND_API_KEY) {
+      console.error('❌ API key de Resend no configurada');
       return NextResponse.json({ error: 'API key de Resend no configurada' }, { status: 500 });
     }
+
+    console.log('✅ API key de Resend encontrada');
 
     const { to, nombreInvitado, obra, fecha, lugar, qrCodes } = await req.json();
     // qrCodes: array de objetos { imageUrl: string, link: string }
@@ -35,19 +38,29 @@ export async function POST(req: NextRequest) {
       </div>
     `;
 
+    console.log('📧 Enviando email con Resend...');
+    console.log('- From: El Escándalo <onboarding@resend.dev>');
+    console.log('- To:', to);
+    console.log('- Subject:', `Tu invitación para ${obra}`);
+
     const { data, error } = await resend.emails.send({
-      from: 'El Escándalo <no-reply@elescandalo.com>',
+      from: 'El Escándalo <onboarding@resend.dev>',
       to,
       subject: `Tu invitación para ${obra}`,
       html,
     });
 
     if (error) {
+      console.error('❌ Error de Resend:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+
+    console.log('✅ Email enviado exitosamente');
     return NextResponse.json({ success: true, data });
       } catch (err: unknown) {
+      console.error('❌ Error inesperado en send-invite:', err);
       const errorMessage = err instanceof Error ? err.message : 'Error inesperado';
+      console.error('❌ Mensaje de error:', errorMessage);
       return NextResponse.json({ error: errorMessage }, { status: 500 });
     }
 } 

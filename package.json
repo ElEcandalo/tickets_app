@@ -17,6 +17,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.39.7",
     "@types/qrcode": "^1.5.5",
+    "dotenv": "^17.2.0",
     "html5-qrcode": "^2.3.8",
     "next": "15.4.1",
     "qrcode": "^1.5.4",
