@@ -247,24 +247,39 @@ export default function InvitadoModal({ isOpen, onClose, invitado, onSuccess, fu
       if (!invitadoData.updated_at) delete (invitadoData as { created_at?: string; updated_at?: string; id?: string }).updated_at;
       // Eliminar id si está vacío o undefined para que la base lo genere
       if (!invitadoData.id) delete (invitadoData as { created_at?: string; updated_at?: string; id?: string }).id;
-      // Convertir colaborador_id y funcion_id a null si son string vacío
-      if (invitadoData.colaborador_id === '') invitadoData.colaborador_id = null;
+      // Convertir colaborador_id y funcion_id a null si son string vacío o undefined
+      if (invitadoData.colaborador_id === '' || invitadoData.colaborador_id === undefined) invitadoData.colaborador_id = null;
       if (invitadoData.funcion_id === '') invitadoData.funcion_id = null;
 
-      console.log('Data to send to Supabase:', invitadoData);
+      // Filtrar solo los campos válidos para la tabla 'invitados'
+      const invitadoPayload: any = {
+        funcion_id: invitadoData.funcion_id,
+        colaborador_id: invitadoData.colaborador_id,
+        nombre: invitadoData.nombre,
+        email: invitadoData.email,
+        telefono: invitadoData.telefono,
+        cantidad_tickets: invitadoData.cantidad_tickets,
+        created_at: invitadoData.created_at,
+        updated_at: invitadoData.updated_at,
+      };
+      if (isEditing && invitado?.id) {
+        invitadoPayload.id = invitado.id;
+      }
+
+      console.log('Data to send to Supabase:', invitadoPayload);
 
       let result;
       if (isEditing && invitado?.id) {
         // Actualizar invitado existente
         result = await supabase
           .from('invitados')
-          .update(invitadoData)
+          .update(invitadoPayload)
           .eq('id', invitado.id);
       } else {
         // Crear nuevo invitado
         result = await supabase
           .from('invitados')
-          .insert([invitadoData])
+          .insert([invitadoPayload])
           .select();
       }
 

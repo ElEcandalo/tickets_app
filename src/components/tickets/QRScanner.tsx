@@ -12,6 +12,17 @@ export default function QRScanner({ onScan, onError }: QRScannerProps) {
   const scannerRef = useRef<Html5QrcodeScanner | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState<string>('');
+  const [noQRTimeout, setNoQRTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [noQRDetected, setNoQRDetected] = useState(false);
+
+  // Función para limpiar el timeout
+  const clearNoQRTimeout = () => {
+    if (noQRTimeout) {
+      clearTimeout(noQRTimeout);
+      setNoQRTimeout(null);
+    }
+    setNoQRDetected(false);
+  };
 
   useEffect(() => {
     if (!scannerRef.current) {
@@ -21,20 +32,21 @@ export default function QRScanner({ onScan, onError }: QRScannerProps) {
           fps: 10,
           qrbox: { width: 250, height: 250 },
           aspectRatio: 1.0,
-          supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
+          supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
+          // Forzar cámara trasera
+          videoConstraints: { facingMode: { exact: "environment" } },
         },
         false
       );
 
       scanner.render(
         (decodedText) => {
-          console.log('🔍 QR escaneado:', decodedText);
+          clearNoQRTimeout();
+          setNoQRDetected(false);
+          setError('');
           onScan(decodedText);
-          // Opcional: detener el escáner después del primer escaneo
-          // scanner.clear();
         },
         (errorMessage) => {
-          console.log('⚠️ Error de escaneo:', errorMessage);
           // No mostrar errores menores como "No QR code found"
           if (!errorMessage.includes('No QR code found')) {
             setError(errorMessage);
@@ -45,6 +57,12 @@ export default function QRScanner({ onScan, onError }: QRScannerProps) {
 
       scannerRef.current = scanner;
       setIsScanning(true);
+
+      // Timeout para mostrar mensaje si no se detecta QR
+      const timeout = setTimeout(() => {
+        setNoQRDetected(true);
+      }, 10000);
+      setNoQRTimeout(timeout);
     }
 
     return () => {
@@ -53,7 +71,9 @@ export default function QRScanner({ onScan, onError }: QRScannerProps) {
         scannerRef.current = null;
         setIsScanning(false);
       }
+      clearNoQRTimeout();
     };
+    // eslint-disable-next-line
   }, [onScan, onError]);
 
   const stopScanner = () => {
@@ -62,6 +82,7 @@ export default function QRScanner({ onScan, onError }: QRScannerProps) {
       scannerRef.current = null;
       setIsScanning(false);
     }
+    clearNoQRTimeout();
   };
 
   const startScanner = () => {
@@ -72,18 +93,20 @@ export default function QRScanner({ onScan, onError }: QRScannerProps) {
           fps: 10,
           qrbox: { width: 250, height: 250 },
           aspectRatio: 1.0,
-          supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
+          supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
+          videoConstraints: { facingMode: { exact: "environment" } },
         },
         false
       );
 
       scanner.render(
         (decodedText) => {
-          console.log('🔍 QR escaneado:', decodedText);
+          clearNoQRTimeout();
+          setNoQRDetected(false);
+          setError('');
           onScan(decodedText);
         },
         (errorMessage) => {
-          console.log('⚠️ Error de escaneo:', errorMessage);
           if (!errorMessage.includes('No QR code found')) {
             setError(errorMessage);
             onError?.(errorMessage);
@@ -93,6 +116,10 @@ export default function QRScanner({ onScan, onError }: QRScannerProps) {
 
       scannerRef.current = scanner;
       setIsScanning(true);
+      const timeout = setTimeout(() => {
+        setNoQRDetected(true);
+      }, 10000);
+      setNoQRTimeout(timeout);
     }
   };
 
@@ -129,9 +156,14 @@ export default function QRScanner({ onScan, onError }: QRScannerProps) {
         <div id="qr-reader" className="w-full max-w-md mx-auto"></div>
       </div>
 
-      <div className="text-center text-sm text-gray-600">
-        <p>📱 Apunta la cámara hacia el código QR del ticket</p>
-        <p>💡 Asegúrate de que el QR esté bien iluminado</p>
+      <div className="text-center text-sm">
+        <div className="inline-block bg-gray-900 text-white rounded px-4 py-3">
+          <p className="mb-1">📱 Apunta la cámara hacia el código QR del ticket</p>
+          <p>💡 Asegúrate de que el QR esté bien iluminado</p>
+          {noQRDetected && (
+            <p className="mt-2 text-yellow-300 font-semibold">No se detectó ningún QR. Intenta acercar el código, mejorar la luz o limpiar la cámara.</p>
+          )}
+        </div>
       </div>
     </div>
   );

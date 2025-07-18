@@ -7,6 +7,7 @@ import FuncionesList from '@/components/funciones/FuncionesList';
 import InvitadosList from '@/components/invitados/InvitadosList';
 import QRTest from '@/components/tickets/QRTest';
 import TicketValidator from '@/components/tickets/TicketValidator';
+import Link from 'next/link';
 
 export default function AdminPage() {
   const { user, profile, loading, signOut } = useAuth();
@@ -104,6 +105,15 @@ export default function AdminPage() {
               >
                 🔍 Validador
               </button>
+              {/* Tab de usuarios solo para el admin principal */}
+              {profile?.email === 'elescandalo.info@gmail.com' && (
+                <Link
+                  href="/admin/usuarios"
+                  className="py-2 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                >
+                  🧑‍💼 Usuarios
+                </Link>
+              )}
             </nav>
           </div>
 
