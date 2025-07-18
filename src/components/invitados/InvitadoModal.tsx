@@ -58,6 +58,80 @@ export default function InvitadoModal({ isOpen, onClose, invitado, onSuccess, fu
   const isEditing = !!invitado?.id;
   const funcionSeleccionada = !!selectedFuncionId;
 
+  // Función para enviar email de invitación
+  const sendInvitationEmail = async (
+    invitadoData: InvitadoWithRelations,
+    funcionData: { nombre: string; capacidad_total: number; precio_entrada: number },
+    tickets: any[]
+  ) => {
+    try {
+      // Obtener información de la función (fecha y lugar)
+      const { data: funcionInfo, error: funcionError } = await supabase
+        .from('funciones')
+        .select('fecha, lugar')
+        .eq('id', invitadoData.funcion_id)
+        .single();
+
+      if (funcionError || !funcionInfo) {
+        throw new Error('No se pudo obtener la información de la función');
+      }
+
+      // Preparar los QR codes para el email
+      const qrCodes = tickets.map((ticket, index) => ({
+        imageUrl: ticket.qr_image_url || null,
+        link: ticket.qr_link || `https://tickets-app-git-main-elecandalos-projects.vercel.app/ticket/${ticket.id}`
+      }));
+
+      // Enviar email
+      const response = await fetch('/api/send-invite', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to: invitadoData.email,
+          nombreInvitado: invitadoData.nombre,
+          obra: funcionData.nombre,
+          fecha: new Date(funcionInfo.fecha).toLocaleDateString('es-ES', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          }),
+          lugar: funcionInfo.lugar,
+          qrCodes
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al enviar el email');
+      }
+
+      // Guardar en mailing_list
+      try {
+        await supabase
+          .from('mailing_list')
+          .upsert({
+            email: invitadoData.email,
+            nombre: invitadoData.nombre,
+            created_at: new Date().toISOString()
+          }, {
+            onConflict: 'email'
+          });
+      } catch (mailingError) {
+        console.warn('⚠️ Error guardando en mailing_list:', mailingError);
+        // No fallar si no se puede guardar en mailing_list
+      }
+
+    } catch (error) {
+      console.error('Error en sendInvitationEmail:', error);
+      throw error;
+    }
+  };
+
   useEffect(() => {
     if (isOpen) {
       fetchColaboradores();
@@ -309,6 +383,17 @@ export default function InvitadoModal({ isOpen, onClose, invitado, onSuccess, fu
               formData.cantidad_tickets
             );
             console.log('✅ Tickets generados exitosamente:', tickets.length, 'tickets');
+            
+            // Enviar email de invitación automáticamente
+            try {
+              console.log('📧 Enviando email de invitación...');
+              await sendInvitationEmail(formData, selectedFuncionData, tickets);
+              console.log('✅ Email enviado exitosamente');
+            } catch (emailError) {
+              console.error('❌ Error enviando email:', emailError);
+              // Si falla el email, no completar la creación del invitado
+              throw new Error('Error al enviar el email de invitación. El invitado no se creó.');
+            }
           } else {
             console.warn('⚠️ No se puede generar tickets sin función seleccionada');
           }

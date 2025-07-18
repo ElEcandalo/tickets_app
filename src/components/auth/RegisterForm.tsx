@@ -4,89 +4,64 @@ import { useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useForm } from 'react-hook-form';
 
 export default function RegisterForm() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm({
+    mode: 'onTouched',
+  });
+  const [serverError, setServerError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const router = useRouter();
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-
-    // Validar que las contraseñas coincidan
+  const onSubmit = async (data: any) => {
+    setServerError('');
+    setSuccessMessage('');
+    const { email, password, confirmPassword } = data;
     if (password !== confirmPassword) {
-      setError('Las contraseñas no coinciden');
-      setLoading(false);
+      setServerError('Las contraseñas no coinciden');
       return;
     }
-
-    // Validar longitud mínima
     if (password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres');
-      setLoading(false);
+      setServerError('La contraseña debe tener al menos 6 caracteres');
       return;
     }
-
     try {
-      // Registrar usuario en Supabase Auth
-      const { data, error } = await supabase.auth.signUp({
+      const { data: signUpData, error } = await supabase.auth.signUp({
         email,
         password,
       });
-
       if (error) {
-        setError(error.message);
+        setServerError(error.message);
         return;
       }
-
-      if (data.user) {
-        // Esperar un momento para que el usuario se cree completamente en auth.users
+      if (signUpData.user) {
         await new Promise(resolve => setTimeout(resolve, 1000));
-
         try {
-          // Usar la función RPC para crear el perfil de usuario de forma segura
           const { data: profileData, error: profileError } = await supabase.rpc(
             'create_user_profile',
             {
-              user_id: data.user.id,
-              user_email: data.user.email || email
+              user_id: signUpData.user.id,
+              user_email: signUpData.user.email || email
             }
           );
-
           if (profileError) {
-            console.error('Error creando perfil:', profileError);
-            setError(`Error creando perfil de usuario: ${profileError.message}`);
+            setServerError(`Error creando perfil de usuario: ${profileError.message}`);
             return;
           }
-
           if (profileData && profileData.success) {
-            console.log('✅ Perfil creado exitosamente:', profileData);
-            
-            // Redirigir según el rol
-            if (profileData.is_admin) {
-              router.push('/admin');
-            } else {
-              router.push('/colaborador');
-            }
+            // Si Supabase requiere confirmación de email, mostrar mensaje
+            setSuccessMessage('Registro exitoso. Revisa tu correo y confirma tu cuenta para poder iniciar sesión.');
+            // Opcional: router.push('/login');
           } else {
-            console.error('Error en respuesta de create_user_profile:', profileData);
-            setError('Error en el proceso de registro. Por favor, intenta de nuevo.');
+            setServerError('Error en el proceso de registro. Por favor, intenta de nuevo.');
           }
         } catch (profileErr) {
-          console.error('Error en proceso de perfil:', profileErr);
-          setError('Error en el proceso de registro. Por favor, intenta de nuevo.');
+          setServerError('Error en el proceso de registro. Por favor, intenta de nuevo.');
         }
       }
     } catch (err) {
-      setError('Error inesperado durante el registro');
-      console.error('Register error:', err);
-    } finally {
-      setLoading(false);
+      setServerError('Error inesperado durante el registro');
     }
   };
 
@@ -101,7 +76,7 @@ export default function RegisterForm() {
             Sistema de Gestión de Teatro
           </p>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleRegister}>
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
           <div className="space-y-4">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
@@ -109,15 +84,13 @@ export default function RegisterForm() {
               </label>
               <input
                 id="email"
-                name="email"
                 type="email"
                 autoComplete="email"
-                required
                 className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                 placeholder="tu@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                {...register('email', { required: 'El email es obligatorio', pattern: { value: /^[^@\s]+@[^@\s]+\.[^@\s]+$/, message: 'Email inválido' } })}
               />
+              {errors.email && <p className="text-red-600 text-xs mt-1">{errors.email.message as string}</p>}
             </div>
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
@@ -125,16 +98,14 @@ export default function RegisterForm() {
               </label>
               <input
                 id="password"
-                name="password"
                 type="password"
                 autoComplete="new-password"
-                required
                 className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                 placeholder="Mínimo 6 caracteres"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
                 minLength={6}
+                {...register('password', { required: 'La contraseña es obligatoria', minLength: { value: 6, message: 'La contraseña debe tener al menos 6 caracteres' } })}
               />
+              {errors.password && <p className="text-red-600 text-xs mt-1">{errors.password.message as string}</p>}
             </div>
             <div>
               <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
@@ -142,32 +113,35 @@ export default function RegisterForm() {
               </label>
               <input
                 id="confirmPassword"
-                name="confirmPassword"
                 type="password"
                 autoComplete="new-password"
-                required
                 className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                 placeholder="Repite tu contraseña"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
                 minLength={6}
+                {...register('confirmPassword', { required: 'Debes confirmar la contraseña', validate: (value: string) => value === watch('password') || 'Las contraseñas no coinciden' })}
               />
+              {errors.confirmPassword && <p className="text-red-600 text-xs mt-1">{errors.confirmPassword.message as string}</p>}
             </div>
           </div>
 
-          {error && (
+          {serverError && (
             <div className="rounded-md bg-red-50 p-4">
-              <div className="text-sm text-red-700">{error}</div>
+              <div className="text-sm text-red-700">{serverError}</div>
+            </div>
+          )}
+          {successMessage && (
+            <div className="rounded-md bg-green-50 p-4">
+              <div className="text-sm text-green-700">{successMessage}</div>
             </div>
           )}
 
           <div>
             <button
               type="submit"
-              disabled={loading}
+              disabled={isSubmitting}
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Registrando...' : 'Registrarse'}
+              {isSubmitting ? 'Registrando...' : 'Registrarse'}
             </button>
           </div>
 
