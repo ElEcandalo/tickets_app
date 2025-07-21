@@ -31,7 +31,7 @@ interface InvitadoModalProps {
 
 export default function InvitadoModal({ isOpen, onClose, invitado, onSuccess, funcionId }: InvitadoModalProps) {
   const { user, profile, loading } = useAuth();
-  const [loading, setLoading] = useState(false);
+  const [formLoading, setFormLoading] = useState(false);
   const [error, setError] = useState('');
   const [formData, setFormData] = useState<InvitadoWithRelations>({
     id: '',
@@ -206,7 +206,7 @@ export default function InvitadoModal({ isOpen, onClose, invitado, onSuccess, fu
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setFormLoading(true);
     setError('');
     setFieldErrors({});
 
@@ -237,7 +237,7 @@ export default function InvitadoModal({ isOpen, onClose, invitado, onSuccess, fu
           });
         }
         setFieldErrors(newFieldErrors);
-        setLoading(false);
+        setFormLoading(false);
         return;
       }
       setFieldErrors({});
@@ -247,7 +247,7 @@ export default function InvitadoModal({ isOpen, onClose, invitado, onSuccess, fu
 
       if (ticketsNuevos > capacidadDisponible) {
         setError(`No hay suficiente capacidad. Solo quedan ${capacidadDisponible} tickets disponibles.`);
-        setLoading(false);
+        setFormLoading(false);
         return;
       }
 
@@ -343,7 +343,7 @@ export default function InvitadoModal({ isOpen, onClose, invitado, onSuccess, fu
       console.error('Error saving invitado:', err);
       setError('Error inesperado al guardar el invitado');
     } finally {
-      setLoading(false);
+      setFormLoading(false);
     }
   };
 
@@ -567,10 +567,10 @@ export default function InvitadoModal({ isOpen, onClose, invitado, onSuccess, fu
               </button>
               <button
                 type="submit"
-                disabled={loading || !capacidadSuficiente}
+                disabled={formLoading || !capacidadSuficiente}
                 className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white rounded-md text-sm font-medium"
               >
-                {loading ? 'Guardando...' : (isEditing ? 'Actualizar' : 'Crear')}
+                {formLoading ? 'Guardando...' : (isEditing ? 'Actualizar' : 'Crear')}
               </button>
             </div>
           </form>
