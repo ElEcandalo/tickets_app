@@ -13,7 +13,6 @@ export default function TicketsCompactView({ invitadoId, invitadoNombre, invitad
   const [tickets, setTickets] = useState<TicketWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [resendingEmail, setResendingEmail] = useState(false);
 
   const fetchTickets = useCallback(async () => {
     try {
@@ -32,19 +31,6 @@ export default function TicketsCompactView({ invitadoId, invitadoNombre, invitad
     fetchTickets();
   }, [fetchTickets]);
 
-  const handleResendEmail = async () => {
-    try {
-      setResendingEmail(true);
-      await TicketService.resendTicketEmail(invitadoId);
-      alert('Email reenviado exitosamente');
-    } catch (err) {
-      setError('Error al reenviar el email');
-      console.error('Error resending email:', err);
-    } finally {
-      setResendingEmail(false);
-    }
-  };
-
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const day = date.getDate().toString().padStart(2, '0');
@@ -58,7 +44,8 @@ export default function TicketsCompactView({ invitadoId, invitadoNombre, invitad
 
   const generateTicketLink = (ticketId: string) => {
     // Generar un enlace que se puede usar para validar el ticket
-    return `${window.location.origin}/validate-ticket/${ticketId}`;
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    return `${baseUrl}/validate-ticket/${ticketId}`;
   };
 
   if (loading) {
@@ -114,13 +101,7 @@ export default function TicketsCompactView({ invitadoId, invitadoNombre, invitad
         </div>
         
         {/* Botón de reenvío */}
-        <button
-          onClick={handleResendEmail}
-          disabled={resendingEmail || !invitadoEmail}
-          className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-md text-sm font-medium"
-        >
-          {resendingEmail ? 'Reenviando...' : 'Reenviar Email con Tickets'}
-        </button>
+        {/* Eliminar resendingEmail, handleResendEmail y el botón de reenviar email */}
       </div>
 
       {/* Lista de tickets optimizada */}

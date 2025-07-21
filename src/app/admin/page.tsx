@@ -6,7 +6,6 @@ import { useEffect, useState } from 'react';
 import FuncionesList from '@/components/funciones/FuncionesList';
 import InvitadosList from '@/components/invitados/InvitadosList';
 import QRTest from '@/components/tickets/QRTest';
-import TicketValidator from '@/components/tickets/TicketValidator';
 import Link from 'next/link';
 
 export default function AdminPage() {
@@ -95,16 +94,6 @@ export default function AdminPage() {
               >
                 🧪 QR Test
               </button>
-              <button
-                onClick={() => setActiveTab('validator')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'validator'
-                    ? 'border-indigo-500 text-indigo-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                🔍 Validador
-              </button>
               {/* Tab de usuarios solo para el admin principal */}
               {profile?.email === 'elescandalo.info@gmail.com' && (
                 <Link
@@ -121,7 +110,6 @@ export default function AdminPage() {
           {activeTab === 'funciones' && <FuncionesList />}
           {activeTab === 'invitados' && <InvitadosList />}
           {activeTab === 'qr-test' && <QRTest />}
-          {activeTab === 'validator' && <TicketValidator />}
         </div>
       </main>
     </div>

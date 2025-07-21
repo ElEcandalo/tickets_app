@@ -7,6 +7,7 @@ import FuncionSelector from '../funciones/FuncionSelector';
 import { z } from 'zod';
 import { TicketService } from '@/services/ticketService';
 import type { Invitado } from '@/types/invitados';
+import { useAuth } from '@/hooks/useAuth';
 
 // Esquema de validación para Invitado
 const invitadoSchema = z.object({
@@ -29,6 +30,7 @@ interface InvitadoModalProps {
 }
 
 export default function InvitadoModal({ isOpen, onClose, invitado, onSuccess, funcionId }: InvitadoModalProps) {
+  const { user, profile, loading } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [formData, setFormData] = useState<InvitadoWithRelations>({
@@ -57,80 +59,6 @@ export default function InvitadoModal({ isOpen, onClose, invitado, onSuccess, fu
 
   const isEditing = !!invitado?.id;
   const funcionSeleccionada = !!selectedFuncionId;
-
-  // Función para enviar email de invitación
-  const sendInvitationEmail = async (
-    invitadoData: InvitadoWithRelations,
-    funcionData: { nombre: string; capacidad_total: number; precio_entrada: number },
-    tickets: Array<{ id: string; qr_image_url?: string; qr_link?: string }>
-  ) => {
-    try {
-      // Obtener información de la función (fecha y lugar)
-      const { data: funcionInfo, error: funcionError } = await supabase
-        .from('funciones')
-        .select('fecha, lugar')
-        .eq('id', invitadoData.funcion_id)
-        .single();
-
-      if (funcionError || !funcionInfo) {
-        throw new Error('No se pudo obtener la información de la función');
-      }
-
-      // Preparar los QR codes para el email
-      const qrCodes = tickets.map((ticket) => ({
-        imageUrl: ticket.qr_image_url || null,
-        link: ticket.qr_link || `https://tickets-app-git-main-elecandalos-projects.vercel.app/ticket/${ticket.id}`
-      }));
-
-      // Enviar email
-      const response = await fetch('/api/send-invite', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          to: invitadoData.email,
-          nombreInvitado: invitadoData.nombre,
-          obra: funcionData.nombre,
-          fecha: new Date(funcionInfo.fecha).toLocaleDateString('es-ES', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-          }),
-          lugar: funcionInfo.lugar,
-          qrCodes
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al enviar el email');
-      }
-
-      // Guardar en mailing_list
-      try {
-        await supabase
-          .from('mailing_list')
-          .upsert({
-            email: invitadoData.email,
-            nombre: invitadoData.nombre,
-            created_at: new Date().toISOString()
-          }, {
-            onConflict: 'email'
-          });
-      } catch (mailingError) {
-        console.warn('⚠️ Error guardando en mailing_list:', mailingError);
-        // No fallar si no se puede guardar en mailing_list
-      }
-
-    } catch (error) {
-      console.error('Error en sendInvitationEmail:', error);
-      throw error;
-    }
-  };
 
   useEffect(() => {
     if (isOpen) {
@@ -202,6 +130,16 @@ export default function InvitadoModal({ isOpen, onClose, invitado, onSuccess, fu
     }
     setError('');
   }, [invitado, funcionId]);
+
+  // Si el usuario es colaborador (no admin), autocompletar y bloquear el campo
+  useEffect(() => {
+    if (profile && profile.role === 'colaborador') {
+      setFormData(prev => ({
+        ...prev,
+        colaborador_id: profile.id
+      }));
+    }
+  }, [profile]);
 
   const fetchColaboradores = async () => {
     try {
@@ -385,15 +323,9 @@ export default function InvitadoModal({ isOpen, onClose, invitado, onSuccess, fu
             console.log('✅ Tickets generados exitosamente:', tickets.length, 'tickets');
             
             // Enviar email de invitación automáticamente
-            try {
-              console.log('📧 Enviando email de invitación...');
-              await sendInvitationEmail(formData, selectedFuncionData, tickets);
-              console.log('✅ Email enviado exitosamente');
-            } catch (emailError) {
-              console.error('❌ Error enviando email:', emailError);
-              // Si falla el email, no completar la creación del invitado
-              throw new Error('Error al enviar el email de invitación. El invitado no se creó.');
-            }
+            // Eliminar la función sendInvitationEmail
+            // Eliminar cualquier llamada a sendInvitationEmail en handleSubmit
+            // Eliminar manejo de error relacionado a email
           } else {
             console.warn('⚠️ No se puede generar tickets sin función seleccionada');
           }
@@ -597,21 +529,27 @@ export default function InvitadoModal({ isOpen, onClose, invitado, onSuccess, fu
                 <label htmlFor="colaborador_id" className="block text-sm font-medium text-gray-700">
                   Colaborador (opcional)
                 </label>
-                <select
-                  id="colaborador_id"
-                  name="colaborador_id"
-                  value={(formData.colaborador_id as string) || ''}
-                  onChange={handleInputChange}
-                  className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm text-gray-900 bg-white ${!funcionSeleccionada ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}`}
-                  disabled={!funcionSeleccionada}
-                >
-                  <option value="">Sin colaborador</option>
-                  {colaboradores.map((colaborador) => (
-                    <option key={colaborador.id} value={colaborador.id}>
-                      {colaborador.nombre} ({colaborador.email})
-                    </option>
-                  ))}
-                </select>
+                {profile?.role === 'colaborador' ? (
+                  <div className="mt-1 text-gray-800 bg-gray-100 rounded px-3 py-2">
+                    {profile.full_name || ''} ({profile.email})
+                  </div>
+                ) : (
+                  <select
+                    id="colaborador_id"
+                    name="colaborador_id"
+                    value={(formData.colaborador_id as string) || ''}
+                    onChange={handleInputChange}
+                    className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm text-gray-900 bg-white ${!funcionSeleccionada ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}`}
+                    disabled={!funcionSeleccionada}
+                  >
+                    <option value="">Sin colaborador</option>
+                    {colaboradores.map((colaborador) => (
+                      <option key={colaborador.id} value={colaborador.id}>
+                        {colaborador.nombre} ({colaborador.email})
+                      </option>
+                    ))}
+                  </select>
+                )}
                 {loadingColaboradores && (
                   <p className="mt-1 text-xs text-gray-500">Cargando colaboradores...</p>
                 )}

@@ -4,6 +4,10 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { TicketService, TicketWithDetails } from '@/services/ticketService';
 import Image from 'next/image';
 import TicketsCompactView from './TicketsCompactView';
+import html2canvas from 'html2canvas';
+import useSWR from 'swr';
+import { supabase } from '@/lib/supabaseClient';
+import { QRCodeCanvas } from 'qrcode.react';
 
 interface TicketsListProps {
   invitadoId: string;
@@ -13,8 +17,16 @@ interface TicketsListProps {
 
 const TICKETS_PER_PAGE = 5;
 
+const fetchTickets = async (invitadoId: string) => {
+  const { data, error } = await supabase
+    .from('tickets')
+    .select('id, funcion_id, invitado_id, usado, created_at, updated_at, funcion:funciones(nombre, fecha, ubicacion)')
+    .eq('invitado_id', invitadoId);
+  if (error) throw error;
+  return data || [];
+};
+
 export default function TicketsList({ invitadoId, invitadoNombre, invitadoEmail }: TicketsListProps) {
-  const [tickets, setTickets] = useState<TicketWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [resendingEmail, setResendingEmail] = useState(false);
@@ -24,37 +36,16 @@ export default function TicketsList({ invitadoId, invitadoNombre, invitadoEmail 
   const [currentPage, setCurrentPage] = useState(1);
   const [viewMode, setViewMode] = useState<'compact' | 'detailed' | 'optimized'>('compact');
 
-  const fetchTickets = useCallback(async () => {
-    try {
-      setLoading(true);
-      console.log('🔍 Buscando tickets para invitado:', invitadoId);
-      const ticketsData = await TicketService.getTicketsByInvitado(invitadoId);
-      console.log('📋 Tickets encontrados:', ticketsData.length);
-      setTickets(ticketsData);
-    } catch (err) {
-      console.error('❌ Error al cargar los tickets:', err);
-      setError('Error al cargar los tickets');
-    } finally {
-      setLoading(false);
-    }
-  }, [invitadoId]);
+  const { data: tickets = [], error: ticketsError, isLoading, mutate } = useSWR(
+    invitadoId ? ['tickets', invitadoId] : null,
+    () => fetchTickets(invitadoId)
+  );
 
   useEffect(() => {
-    fetchTickets();
-  }, [fetchTickets]);
-
-  const handleResendEmail = async () => {
-    try {
-      setResendingEmail(true);
-      await TicketService.resendTicketEmail(invitadoId);
-      alert('Email reenviado exitosamente');
-    } catch (err) {
-      setError('Error al reenviar el email');
-      console.error('Error resending email:', err);
-    } finally {
-      setResendingEmail(false);
+    if (tickets.length > 10 && viewMode !== 'optimized') {
+      setViewMode('optimized');
     }
-  };
+  }, [tickets.length, viewMode]);
 
   const handleShowQR = async (ticketId: string) => {
     console.log('🔍 handleShowQR llamado con ticketId:', ticketId);
@@ -108,13 +99,6 @@ export default function TicketsList({ invitadoId, invitadoNombre, invitadoEmail 
   const endIndex = startIndex + TICKETS_PER_PAGE;
   const currentTickets = tickets.slice(startIndex, endIndex);
 
-  // Auto-cambiar a vista optimizada si hay muchos tickets
-  useEffect(() => {
-    if (tickets.length > 10 && viewMode !== 'optimized') {
-      setViewMode('optimized');
-    }
-  }, [tickets.length, viewMode]);
-
   // Estadísticas
   const stats = useMemo(() => {
     const total = tickets.length;
@@ -123,7 +107,7 @@ export default function TicketsList({ invitadoId, invitadoNombre, invitadoEmail 
     return { total, usados, disponibles };
   }, [tickets]);
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center py-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
@@ -131,10 +115,10 @@ export default function TicketsList({ invitadoId, invitadoNombre, invitadoEmail 
     );
   }
 
-  if (error) {
+  if (ticketsError) {
     return (
       <div className="rounded-md bg-red-50 p-4">
-        <div className="text-sm text-red-700">{error}</div>
+        <div className="text-sm text-red-700">Error al cargar los tickets</div>
       </div>
     );
   }
@@ -180,13 +164,8 @@ export default function TicketsList({ invitadoId, invitadoNombre, invitadoEmail 
         </div>
         
         {/* Botón de reenvío */}
-        <button
-          onClick={handleResendEmail}
-          disabled={resendingEmail || !invitadoEmail}
-          className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-md text-sm font-medium"
-        >
-          {resendingEmail ? 'Reenviando...' : 'Reenviar Email con Tickets'}
-        </button>
+        {/* Eliminar handleResendEmail y el botón de reenviar email */}
+
       </div>
 
       {/* Lista de tickets */}
@@ -235,7 +214,7 @@ export default function TicketsList({ invitadoId, invitadoNombre, invitadoEmail 
                           #{startIndex + index + 1}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {ticket.funcion?.nombre}
+                          {Array.isArray(ticket.funcion) ? ticket.funcion[0]?.nombre : ticket.funcion?.nombre}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -273,7 +252,11 @@ export default function TicketsList({ invitadoId, invitadoNombre, invitadoEmail 
                       <h4 className="text-md font-medium text-gray-900">
                         Ticket #{startIndex + index + 1}
                       </h4>
-                      {ticket.funcion && (
+                      {Array.isArray(ticket.funcion) ? ticket.funcion[0] && (
+                        <p className="text-sm text-gray-600">
+                          {ticket.funcion[0].nombre} - {formatDate(ticket.funcion[0].fecha)}
+                        </p>
+                      ) : ticket.funcion && (
                         <p className="text-sm text-gray-600">
                           {ticket.funcion.nombre} - {formatDate(ticket.funcion.fecha)}
                         </p>
@@ -305,21 +288,57 @@ export default function TicketsList({ invitadoId, invitadoNombre, invitadoEmail 
                   {/* QR Code */}
                   {showQR === ticket.id && (
                     <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                      <div className="flex justify-center">
-                        <div className="text-center">
-                          <div className="bg-white p-2 rounded-lg inline-block">
-                            <Image
-                              src={qrCodes[ticket.id] || ''}
-                              alt={`QR Code Ticket ${startIndex + index + 1}`}
-                              width={150}
-                              height={150}
-                              className="rounded"
-                            />
-                          </div>
-                          <p className="text-xs text-gray-500 mt-2">
-                            Código QR único para validación
-                          </p>
+                      <div className="flex flex-col items-center justify-center">
+                        <QRCodeCanvas value={`${process.env.NEXT_PUBLIC_BASE_URL}/ticket/${ticket.id}`} size={150} />
+                        <div className="mt-2 text-xs text-gray-700 text-center">
+                          <div><b>Obra:</b> {Array.isArray(ticket.funcion) ? ticket.funcion[0]?.nombre : ticket.funcion?.nombre}</div>
+                          <div><b>Fecha:</b> {Array.isArray(ticket.funcion) ? ticket.funcion[0]?.fecha ? formatDate(ticket.funcion[0].fecha) : '-' : ticket.funcion?.fecha ? formatDate(ticket.funcion.fecha) : '-'}</div>
+                          <div><b>Lugar:</b> {Array.isArray(ticket.funcion) ? ticket.funcion[0]?.ubicacion || 'Yapeyu 670, Almagro' : ticket.funcion?.ubicacion || 'Yapeyu 670, Almagro'}</div>
+                          <div className="text-gray-500">Yapeyu 670, Almagro</div>
+                          <div><b>Invitado:</b> {invitadoNombre}</div>
+                          <div className="mt-1 text-gray-500">ID de ticket: ...{ticket.id.slice(-4)}</div>
                         </div>
+                      </div>
+                      <div className="flex gap-2 mt-3">
+                        <button
+                          onClick={() => {
+                            // Buscar el canvas dentro del contenedor del QR
+                            const container = document.getElementById(`qr-container-${ticket.id}`);
+                            if (container) {
+                              const canvas = container.querySelector('canvas');
+                              if (canvas) {
+                                const link = document.createElement('a');
+                                link.download = `ticket_qr_${ticket.id}.png`;
+                                link.href = canvas.toDataURL('image/png');
+                                link.click();
+                              } else {
+                                alert('No se encontró el QR para descargar');
+                              }
+                            }
+                          }}
+                          className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm"
+                        >
+                          Descargar QR
+                        </button>
+                        <button
+                          onClick={async () => {
+                            const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+                            const link = `${baseUrl}/ticket/${ticket.id}`;
+                            if (navigator.share) {
+                              await navigator.share({
+                                title: 'Invitación El Escándalo',
+                                text: `Te comparto tu invitación para ${Array.isArray(ticket.funcion) ? ticket.funcion[0]?.nombre : ticket.funcion?.nombre} el ${Array.isArray(ticket.funcion) ? ticket.funcion[0]?.fecha ? formatDate(ticket.funcion[0].fecha) : '-' : ticket.funcion?.fecha ? formatDate(ticket.funcion.fecha) : '-'} en ${Array.isArray(ticket.funcion) ? ticket.funcion[0]?.ubicacion || 'Yapeyu 670, Almagro' : ticket.funcion?.ubicacion || 'Yapeyu 670, Almagro'}. Invitado: ${invitadoNombre}`,
+                                url: link,
+                              });
+                            } else {
+                              await navigator.clipboard.writeText(link);
+                              alert('Enlace copiado al portapapeles');
+                            }
+                          }}
+                          className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm"
+                        >
+                          Compartir QR/Link
+                        </button>
                       </div>
                     </div>
                   )}

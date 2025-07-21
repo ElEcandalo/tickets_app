@@ -138,8 +138,8 @@ export default function UsuariosAdminPage() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead>
               <tr>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Nombre</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Rol</th>
                 <th className="px-4 py-2"></th>
               </tr>
@@ -147,19 +147,9 @@ export default function UsuariosAdminPage() {
             <tbody className="divide-y divide-gray-100">
               {usuarios.map((u) => (
                 <tr key={u.id}>
+                  <td className="px-4 py-2 text-sm text-gray-900">{u.full_name || '-'}</td>
                   <td className="px-4 py-2 text-sm text-gray-900">{u.email}</td>
-                  <td className="px-4 py-2 text-sm text-gray-700">{u.full_name || '-'}</td>
-                  <td className="px-4 py-2 text-sm">
-                    <select
-                      value={u.role}
-                      onChange={(e) => handleChangeRole(u.id, e.target.value as UserRole)}
-                      className="border rounded px-2 py-1 text-sm"
-                      disabled={actionLoading === u.id + 'admin' || actionLoading === u.id + 'colaborador'}
-                    >
-                      <option value="colaborador">Colaborador</option>
-                      <option value="admin">Admin</option>
-                    </select>
-                  </td>
+                  <td className="px-4 py-2 text-sm text-gray-900">{u.role}</td>
                   <td className="px-4 py-2 text-right">
                     <button
                       onClick={() => handleDelete(u.id)}

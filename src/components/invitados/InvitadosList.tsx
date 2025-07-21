@@ -234,91 +234,6 @@ export default function InvitadosList({ funcionId: propFuncionId, showStats = tr
     setIsTicketsModalOpen(true);
   };
 
-  const handleResendEmail = async (invitado: InvitadoWithRelations) => {
-    if (!invitado.email) {
-      setEmailMessage({ type: 'error', message: 'Este invitado no tiene email registrado' });
-      return;
-    }
-
-    setResendingEmail(invitado.id!);
-    setEmailMessage(null);
-
-    try {
-      // Obtener tickets del invitado
-      const { data: tickets, error: ticketsError } = await supabase
-        .from('tickets')
-        .select('id, qr_image_url, qr_link')
-        .eq('invitado_id', invitado.id);
-
-      if (ticketsError || !tickets || tickets.length === 0) {
-        throw new Error('No se encontraron tickets para este invitado');
-      }
-
-      // Obtener información de la función
-      const funcion = getFuncion(invitado);
-      if (!funcion) {
-        throw new Error('No se pudo obtener la información de la función');
-      }
-
-      const { data: funcionInfo, error: funcionError } = await supabase
-        .from('funciones')
-        .select('fecha, lugar')
-        .eq('id', invitado.funcion_id)
-        .single();
-
-      if (funcionError || !funcionInfo) {
-        throw new Error('No se pudo obtener la información completa de la función');
-      }
-
-      // Preparar los QR codes para el email
-      const qrCodes = tickets.map((ticket) => ({
-        imageUrl: ticket.qr_image_url || null,
-        link: ticket.qr_link || `https://tickets-app-git-main-elecandalos-projects.vercel.app/ticket/${ticket.id}`
-      }));
-
-      // Enviar email
-      const response = await fetch('/api/send-invite', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          to: invitado.email,
-          nombreInvitado: invitado.nombre,
-          obra: funcion.nombre,
-          fecha: new Date(funcionInfo.fecha).toLocaleDateString('es-ES', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-          }),
-          lugar: funcionInfo.lugar,
-          qrCodes
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al enviar el email');
-      }
-
-      setEmailMessage({ type: 'success', message: 'Email reenviado exitosamente' });
-
-      // Limpiar mensaje después de 3 segundos
-      setTimeout(() => {
-        setEmailMessage(null);
-      }, 3000);
-
-    } catch (error) {
-      console.error('Error reenviando email:', error);
-      setEmailMessage({ type: 'error', message: error instanceof Error ? error.message : 'Error inesperado al reenviar el email' });
-    } finally {
-      setResendingEmail(null);
-    }
-  };
-
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const day = date.getDate().toString().padStart(2, '0');
@@ -507,19 +422,6 @@ export default function InvitadosList({ funcionId: propFuncionId, showStats = tr
                       >
                         Ver Tickets
                       </button>
-                      {invitado.email && (
-                        <button
-                          onClick={() => handleResendEmail(invitado)}
-                          disabled={resendingEmail === invitado.id}
-                          className={`text-sm font-medium ${
-                            resendingEmail === invitado.id
-                              ? 'text-gray-400 cursor-not-allowed'
-                              : 'text-green-600 hover:text-green-900'
-                          }`}
-                        >
-                          {resendingEmail === invitado.id ? 'Enviando...' : '📧 Reenviar'}
-                        </button>
-                      )}
                       <button
                         onClick={() => handleDelete(invitado.id!)}
                         className="text-red-600 hover:text-red-900 text-sm font-medium"

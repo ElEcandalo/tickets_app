@@ -7,17 +7,31 @@ import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 
 export default function RegisterForm() {
-  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<{ email: string; password: string; confirmPassword: string }>({
+  const { register, handleSubmit, watch, formState: { errors, isSubmitting }, setError, clearErrors } = useForm<{ full_name: string; email: string; password: string; confirmPassword: string }>({
     mode: 'onTouched',
   });
   const [serverError, setServerError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   // const router = useRouter(); // No se usa actualmente
 
-  const onSubmit = async (data: { email: string; password: string; confirmPassword: string }) => {
+  // Validación asíncrona para email duplicado
+  const validateEmailUnique = async (email: string) => {
+    if (!email) return true;
+    // Consulta a Supabase para ver si ya existe el email
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .select('id')
+      .eq('email', email)
+      .maybeSingle();
+    if (error) return 'Error validando email';
+    if (data) return 'Ya existe un usuario con ese email';
+    return true;
+  };
+
+  const onSubmit = async (data: { full_name: string; email: string; password: string; confirmPassword: string }) => {
     setServerError('');
     setSuccessMessage('');
-    const { email, password, confirmPassword } = data;
+    const { full_name, email, password, confirmPassword } = data;
     if (password !== confirmPassword) {
       setServerError('Las contraseñas no coinciden');
       return;
@@ -42,7 +56,8 @@ export default function RegisterForm() {
             'create_user_profile',
             {
               user_id: signUpData.user.id,
-              user_email: signUpData.user.email || email
+              user_email: signUpData.user.email || email,
+              full_name: full_name
             }
           );
           if (profileError) {
@@ -50,9 +65,7 @@ export default function RegisterForm() {
             return;
           }
           if (profileData && profileData.success) {
-            // Si Supabase requiere confirmación de email, mostrar mensaje
             setSuccessMessage('Registro exitoso. Revisa tu correo y confirma tu cuenta para poder iniciar sesión.');
-            // Opcional: router.push('/login');
           } else {
             setServerError('Error en el proceso de registro. Por favor, intenta de nuevo.');
           }
@@ -81,6 +94,20 @@ export default function RegisterForm() {
         <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
           <div className="space-y-4">
             <div>
+              <label htmlFor="full_name" className="block text-sm font-medium text-gray-700">
+                Nombre completo
+              </label>
+              <input
+                id="full_name"
+                type="text"
+                autoComplete="name"
+                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                placeholder="Ej: Juan Pérez"
+                {...register('full_name', { required: 'El nombre es obligatorio' })}
+              />
+              {errors.full_name && <p className="text-red-600 text-xs mt-1">{errors.full_name.message as string}</p>}
+            </div>
+            <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                 Email
               </label>
@@ -90,7 +117,11 @@ export default function RegisterForm() {
                 autoComplete="email"
                 className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                 placeholder="tu@email.com"
-                {...register('email', { required: 'El email es obligatorio', pattern: { value: /^[^@\s]+@[^@\s]+\.[^@\s]+$/, message: 'Email inválido' } })}
+                {...register('email', {
+                  required: 'El email es obligatorio',
+                  pattern: { value: /^[^@\s]+@[^@\s]+\.[^@\s]+$/, message: 'Email inválido' },
+                  validate: validateEmailUnique
+                })}
               />
               {errors.email && <p className="text-red-600 text-xs mt-1">{errors.email.message as string}</p>}
             </div>

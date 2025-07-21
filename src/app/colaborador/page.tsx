@@ -4,7 +4,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import InvitadosList from '@/components/invitados/InvitadosList';
-import TicketValidator from '@/components/tickets/TicketValidator';
 
 export default function ColaboradorPage() {
   const { user, profile, loading, signOut } = useAuth();
@@ -62,11 +61,6 @@ export default function ColaboradorPage() {
           <div className="bg-white overflow-hidden shadow rounded-lg p-6">
             <h2 className="text-xl font-semibold mb-4 text-green-700">👥 Gestionar Invitados</h2>
             <InvitadosList showStats={false} />
-          </div>
-          {/* Validador QR */}
-          <div className="bg-white overflow-hidden shadow rounded-lg p-6">
-            <h2 className="text-xl font-semibold mb-4 text-orange-700">🔍 Validar Tickets QR</h2>
-            <TicketValidator />
           </div>
         </div>
       </main>
