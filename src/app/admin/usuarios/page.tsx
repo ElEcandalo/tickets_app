@@ -55,9 +55,23 @@ export default function UsuariosAdminPage() {
     setActionLoading(id);
     setError("");
     try {
+      // 1. Eliminar de Supabase Auth (auth.users) vía API
+      const res = await fetch("/api/admin/delete-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: id }),
+      });
+      const result = await res.json();
+      if (!result.success) {
+        setError(result.error || "Error eliminando usuario de Auth");
+        setActionLoading(null);
+        return;
+      }
+      // 2. Eliminar de user_profiles
       const { error } = await supabase.from("user_profiles").delete().eq("id", id);
       if (error) {
         setError(error.message);
+        setActionLoading(null);
         return;
       }
       setUsuarios((prev) => prev.filter((u) => u.id !== id));
