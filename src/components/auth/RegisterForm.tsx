@@ -63,18 +63,21 @@ export default function RegisterForm() {
             setServerError(`Error creando perfil de usuario: ${profileError.message}`);
             return;
           }
-          if (profileData && profileData.success) {
-            setSuccessMessage('Registro exitoso. Revisa tu correo y confirma tu cuenta para poder iniciar sesión.');
-          } else {
-            setServerError('Error en el proceso de registro. Por favor, intenta de nuevo.');
-          }
-        } catch (profileErr) {
-          console.error('Error creating profile:', profileErr);
-          setServerError('Error en el proceso de registro. Por favor, intenta de nuevo.');
+          // Si el rol es colaborador, crea el registro en colaboradores
+          // (por defecto, todos los nuevos son colaboradores)
+          await supabase.from('colaboradores').insert([
+            {
+              id: signUpData.user.id,
+              nombre: full_name,
+              email: email
+            }
+          ]);
+          setSuccessMessage('Registro exitoso. Revisa tu email para confirmar tu cuenta.');
+        } catch (err) {
+          setServerError('Error inesperado al crear el perfil de usuario');
         }
       }
     } catch (err) {
-      console.error('Error during registration:', err);
       setServerError('Error inesperado durante el registro');
     }
   };
