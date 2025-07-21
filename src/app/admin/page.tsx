@@ -5,13 +5,12 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import FuncionesList from '@/components/funciones/FuncionesList';
 import InvitadosList from '@/components/invitados/InvitadosList';
-import QRTest from '@/components/tickets/QRTest';
 import Link from 'next/link';
 
 export default function AdminPage() {
   const { user, profile, loading, signOut } = useAuth();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'funciones' | 'invitados' | 'qr-test' | 'validator'>('funciones');
+  const [activeTab, setActiveTab] = useState<'funciones' | 'invitados' | 'validator'>('funciones');
 
   useEffect(() => {
     if (!loading && (!user || profile?.role !== 'admin')) {
@@ -84,16 +83,6 @@ export default function AdminPage() {
               >
                 👥 Invitados
               </button>
-              <button
-                onClick={() => setActiveTab('qr-test')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'qr-test'
-                    ? 'border-indigo-500 text-indigo-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                🧪 QR Test
-              </button>
               {/* Tab de usuarios solo para el admin principal */}
               {profile?.email === 'elescandalo.info@gmail.com' && (
                 <Link
@@ -109,7 +98,6 @@ export default function AdminPage() {
           {/* Tab Content */}
           {activeTab === 'funciones' && <FuncionesList />}
           {activeTab === 'invitados' && <InvitadosList />}
-          {activeTab === 'qr-test' && <QRTest />}
         </div>
       </main>
     </div>
