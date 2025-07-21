@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabaseClient';
 import InvitadoModal from './InvitadoModal';
 import TicketsList from '../tickets/TicketsList';
 import { Invitado, InvitadoWithRelations, InvitadoStats } from '@/types/invitados';
+import useSWR from 'swr';
 
 interface FuncionOption {
   id: string;
@@ -39,10 +40,15 @@ function getFuncion(obj: {
   return undefined;
 }
 
+// Helper para extraer colaborador del resultado de Supabase
+function extractColaborador(i: InvitadoWithRelations & { colaboradores?: { id: string; nombre: string; email: string } | { id: string; nombre: string; email: string }[] }) {
+  if (Array.isArray(i.colaboradores)) return i.colaboradores[0] || undefined;
+  if (typeof i.colaboradores === 'object') return i.colaboradores;
+  return undefined;
+}
+
 export default function InvitadosList({ funcionId: propFuncionId, showStats = true }: InvitadosListProps) {
-  const [invitados, setInvitados] = useState<InvitadoWithRelations[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  // Estados para modales y selección
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedInvitado, setSelectedInvitado] = useState<Invitado | null>(null);
   const [isTicketsModalOpen, setIsTicketsModalOpen] = useState(false);
@@ -50,11 +56,12 @@ export default function InvitadosList({ funcionId: propFuncionId, showStats = tr
   const [stats, setStats] = useState<InvitadoStats | null>(null);
   const [funcionId, setFuncionId] = useState<string | undefined>(propFuncionId);
   const [funciones, setFunciones] = useState<FuncionOption[]>([]);
+  const [error, setError] = useState('');
 
+  // Fetch funciones (sin SWR por ser pequeño y estático)
   useEffect(() => {
     fetchFunciones();
   }, []);
-
   const fetchFunciones = async () => {
     const { data, error } = await supabase
       .from('funciones')
@@ -94,119 +101,75 @@ export default function InvitadosList({ funcionId: propFuncionId, showStats = tr
     });
   }, [funcionId]);
 
-  const fetchInvitados = useCallback(async () => {
-    try {
-      setLoading(true);
-      let query = supabase
-        .from('invitados')
-        .select('id, funcion_id, colaborador_id, nombre, email, telefono, cantidad_tickets, created_at, updated_at, funciones (id, nombre, fecha, capacidad_total, precio_entrada), colaboradores (id, nombre, email)')
-        .order('created_at', { ascending: false });
-
-      if (funcionId) {
-        query = query.eq('funcion_id', funcionId);
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        setError(error.message);
-        return;
-      }
-
-      setInvitados((data || []).map((i: {
-        id: string;
-        funcion_id: string;
-        colaborador_id: string | null;
-        nombre: string;
-        email: string | null;
-        telefono: string | null;
-        cantidad_tickets: number;
-        created_at: string | null;
-        updated_at: string | null;
-        funciones: {
-          id: string;
-          nombre: string;
-          fecha: string;
-          capacidad_total: number;
-          precio_entrada: number;
-        }[];
-        colaboradores: {
-          id: string;
-          nombre: string;
-          email: string;
-        } | {
-          id: string;
-          nombre: string;
-          email: string;
-        }[];
-      }) => ({
-        ...i,
-        email: i.email || '',
-        telefono: i.telefono || '',
-        colaborador_id: i.colaborador_id || undefined,
-        created_at: i.created_at || '',
-        updated_at: i.updated_at || '',
-        funciones: i.funciones, // ahora es objeto, no array
-        colaborador: Array.isArray(i.colaboradores) ? (i.colaboradores[0] || undefined) : i.colaboradores,
-      })));
-
-      // Calcular estadísticas si se solicita
-      if (showStats) {
-        if (funcionId && (!data || data.length === 0)) {
-          // Si no hay invitados pero hay funcionId, obtener la capacidad de la función
-          const { data: funcionData, error: funcionError } = await supabase
-            .from('funciones')
-            .select('capacidad_total')
-            .eq('id', funcionId)
-            .single();
-          if (!funcionError && funcionData) {
-            calculateStats([], funcionData.capacidad_total);
-          } else {
-            calculateStats([], null);
-          }
-        } else {
-          // Si hay invitados, usa la capacidad de la función del primer invitado
-          const capacidad = funcionId && data && data.length > 0 && data[0].funciones && data[0].funciones[0]
-            ? Number(data[0].funciones[0].capacidad_total) || null
-            : null;
-          calculateStats(data || [], capacidad);
-        }
-      }
-    } catch (err) {
-      setError('Error al cargar los invitados');
-      console.error('Error fetching invitados:', err);
-    } finally {
-      setLoading(false);
+  // Fetch invitados con SWR
+  const fetchInvitados = async (funcionId?: string) => {
+    let query = supabase
+      .from('invitados')
+      .select('id, funcion_id, colaborador_id, nombre, email, telefono, cantidad_tickets, created_at, updated_at, funciones (id, nombre, fecha, capacidad_total, precio_entrada), colaboradores (id, nombre, email)')
+      .order('created_at', { ascending: false });
+    if (funcionId) {
+      query = query.eq('funcion_id', funcionId);
     }
-  }, [funcionId, showStats, calculateStats]);
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+    return (data || []).map((i: InvitadoWithRelations & { colaboradores?: { id: string; nombre: string; email: string } | { id: string; nombre: string; email: string }[] }) => ({
+      ...i,
+      email: i.email || '',
+      telefono: i.telefono || '',
+      colaborador_id: i.colaborador_id || undefined,
+      created_at: i.created_at || '',
+      updated_at: i.updated_at || '',
+      funciones: i.funciones,
+      colaborador: extractColaborador(i),
+    }));
+  };
+  const { data: invitados = [], isLoading, mutate } = useSWR(['invitados', funcionId], () => fetchInvitados(funcionId));
 
+  // Calcular estadísticas si se solicita
   useEffect(() => {
-    fetchInvitados();
-  }, [fetchInvitados]);
+    if (!showStats) return;
+    if (funcionId && invitados.length === 0) {
+      // Si no hay invitados pero hay funcionId, obtener la capacidad de la función
+      (async () => {
+        const { data: funcionData, error: funcionError } = await supabase
+          .from('funciones')
+          .select('capacidad_total')
+          .eq('id', funcionId)
+          .single();
+        if (!funcionError && funcionData) {
+          calculateStats([], funcionData.capacidad_total);
+        } else {
+          calculateStats([], null);
+        }
+      })();
+    } else {
+      // Si hay invitados, usa la capacidad de la función del primer invitado
+      const capacidad = funcionId && invitados.length > 0 && invitados[0].funciones && invitados[0].funciones[0]
+        ? Number(invitados[0].funciones[0].capacidad_total) || null
+        : null;
+      calculateStats(invitados, capacidad);
+    }
+  }, [invitados, funcionId, showStats, calculateStats]);
 
+  // Eliminar loading de invitados, ahora es isLoading de SWR
+
+  // Eliminar fetchInvitados, setInvitados, setLoading, etc. (ya no se usan)
+
+  // handleDelete debe mutar SWR
   const handleDelete = async (id: string) => {
     if (!confirm('¿Estás seguro de que quieres eliminar este invitado?')) {
       return;
     }
-
     try {
       const { error } = await supabase
         .from('invitados')
         .delete()
         .eq('id', id);
-
       if (error) {
         setError(error.message);
         return;
       }
-
-      // Actualizar la lista
-      setInvitados(invitados.filter(i => i.id !== id));
-      
-      // Recalcular estadísticas
-      if (showStats) {
-        fetchInvitados();
-      }
+      mutate(); // Refrescar lista
     } catch (err) {
       setError('Error al eliminar el invitado');
       console.error('Error deleting invitado:', err);
@@ -223,8 +186,9 @@ export default function InvitadosList({ funcionId: propFuncionId, showStats = tr
     setIsModalOpen(true);
   };
 
+  // handleModalSuccess debe mutar SWR
   const handleModalSuccess = () => {
-    fetchInvitados();
+    mutate();
   };
 
   const handleViewTickets = (invitado: Invitado) => {
@@ -243,7 +207,7 @@ export default function InvitadosList({ funcionId: propFuncionId, showStats = tr
     return `${day}-${month}-${year} ${hours}:${minutes}`;
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center py-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
