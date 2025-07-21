@@ -6,6 +6,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { Funcion } from '@/types/funciones';
 import ObraSelector from './ObraSelector';
 import { z } from 'zod';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 
 interface FuncionModalProps {
   isOpen: boolean;
@@ -31,112 +33,113 @@ export default function FuncionModal({ isOpen, onClose, funcion, onSuccess }: Fu
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [formData, setFormData] = useState<Funcion>({
-    id: '',
-    obra_id: '',
-    nombre: '',
-    descripcion: '',
-    fecha: '',
-    ubicacion: 'El Escándalo',
-    capacidad_total: 10,
-    precio_entrada: 0,
-    estado: 'ACTIVA',
-    created_by: '',
-  });
-
   const [selectedObraId, setSelectedObraId] = useState<string | null>(null);
-
   const [fieldErrors, setFieldErrors] = useState<{ [key: string]: string }>({});
 
-  const isEditing = !!funcion?.id;
+  // RHF setup
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    formState: { errors, isSubmitting },
+    setError: setFormError,
+    clearErrors
+  } = useForm<{
+    obra_id: string;
+    nombre: string;
+    descripcion?: string;
+    fecha: string;
+    ubicacion: string;
+    capacidad_total: number;
+    precio_entrada: number;
+    estado: 'ACTIVA' | 'CANCELADA' | 'FINALIZADA';
+    created_by: string;
+  }>({
+    resolver: zodResolver(funcionSchema),
+    defaultValues: {
+      obra_id: '',
+      nombre: '',
+      descripcion: '',
+      fecha: '',
+      ubicacion: 'El Escándalo',
+      capacidad_total: 10,
+      precio_entrada: 0,
+      estado: 'ACTIVA',
+      created_by: '',
+    },
+    mode: 'onTouched',
+  });
 
+  // Sincronizar datos iniciales si se edita
   useEffect(() => {
     if (funcion) {
-      setFormData({
-        ...funcion,
-        precio_entrada: Number(funcion.precio_entrada),
-        descripcion: funcion.descripcion || '',
-      });
+      setValue('obra_id', funcion.obra_id || '');
+      setValue('nombre', funcion.nombre || '');
+      setValue('descripcion', funcion.descripcion || '');
+      setValue('fecha', funcion.fecha ? new Date(funcion.fecha).toISOString().slice(0, 16) : '');
+      setValue('ubicacion', funcion.ubicacion || 'El Escándalo');
+      setValue('capacidad_total', funcion.capacidad_total || 10);
+      setValue('precio_entrada', funcion.precio_entrada || 0);
+      setValue('estado', funcion.estado || 'ACTIVA');
+      setValue('created_by', funcion.created_by || user?.id || '');
       setSelectedObraId(funcion.obra_id);
     } else {
-      setFormData({
-        id: '',
-        obra_id: '',
-        nombre: '',
-        descripcion: '',
-        fecha: '',
-        ubicacion: 'El Escándalo',
-        capacidad_total: 10,
-        precio_entrada: 0,
-        estado: 'ACTIVA',
-        created_by: '',
-      });
+      setValue('obra_id', '');
+      setValue('nombre', '');
+      setValue('descripcion', '');
+      setValue('fecha', '');
+      setValue('ubicacion', 'El Escándalo');
+      setValue('capacidad_total', 10);
+      setValue('precio_entrada', 0);
+      setValue('estado', 'ACTIVA');
+      setValue('created_by', user?.id || '');
       setSelectedObraId(null);
     }
     setError('');
-  }, [funcion]);
+    setFieldErrors({});
+  }, [funcion, setValue, user]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleObraSelect = (obraId: string | null, obraData: { nombre: string; descripcion: string | null }) => {
+    setSelectedObraId(obraId);
+    if (obraId) {
+      setValue('obra_id', obraId);
+      setValue('nombre', obraData.nombre);
+      setValue('descripcion', obraData.descripcion || '');
+    }
+  };
+
+  const onSubmit = async (data: { obra_id: string; nombre: string; descripcion?: string; fecha: string; ubicacion: string; capacidad_total: number; precio_entrada: number; estado: 'ACTIVA' | 'CANCELADA' | 'FINALIZADA'; created_by: string; }) => {
     setLoading(true);
     setError('');
     setFieldErrors({});
-
     try {
       // Validar que la fecha no sea anterior al día actual
-      const fechaSeleccionada = new Date(formData.fecha);
+      const fechaSeleccionada = new Date(data.fecha);
       const hoy = new Date();
       hoy.setHours(0, 0, 0, 0);
       if (fechaSeleccionada < hoy) {
-        setFieldErrors({ fecha: 'La fecha de la función no puede ser anterior al día actual.' });
+        setFormError('fecha', { type: 'manual', message: 'La fecha de la función no puede ser anterior al día actual.' });
         setLoading(false);
         return;
       }
-
-      // Prepara los datos para Zod
-      const fechaISO = new Date(formData.fecha).toISOString();
-      const funcionData = {
-        ...formData,
-        fecha: fechaISO,
-        ubicacion: 'El Escándalo',
-        precio_entrada: Number(formData.precio_entrada),
-        capacidad_total: Number(formData.capacidad_total),
-        created_by: user?.id || '',
-      };
-
-      // Validar con Zod y mapear errores por campo
-      const zodResult = funcionSchema.safeParse(funcionData);
-      if (!zodResult.success) {
-        const newFieldErrors: { [key: string]: string } = {};
-        zodResult.error.issues.forEach((err) => {
-          if (err.path && err.path[0]) {
-            newFieldErrors[err.path[0].toString()] = err.message;
-          }
-        });
-        setFieldErrors(newFieldErrors);
-        setLoading(false);
-        return;
-      }
-      setFieldErrors({});
-
       // Validar que obra_id no sea vacío ni null
-      if (!formData.obra_id || formData.obra_id === '') {
-        setError('Debes seleccionar una obra.');
+      if (!data.obra_id || data.obra_id === '') {
+        setFormError('obra_id', { type: 'manual', message: 'Debes seleccionar una obra.' });
         setLoading(false);
         return;
       }
-
       // Preparar datos para Supabase (sin campos vacíos)
-      const supabaseData = { ...funcionData };
+      const supabaseData = { ...data };
       if (!supabaseData.obra_id || supabaseData.obra_id === '') {
-        delete (supabaseData as { obra_id?: string; id?: string }).obra_id;
+        delete (supabaseData as { obra_id?: string; }).obra_id;
       }
-      if (!supabaseData.id || supabaseData.id === '') {
-        delete (supabaseData as { obra_id?: string; id?: string }).id;
+      // Convertir fecha a ISO si es necesario
+      if (supabaseData.fecha) {
+        supabaseData.fecha = new Date(supabaseData.fecha).toISOString();
       }
-
       let result;
-      if (isEditing && funcion?.id) {
+      if (funcion && funcion.id) {
         // Actualizar función existente
         result = await supabase
           .from('funciones')
@@ -148,44 +151,17 @@ export default function FuncionModal({ isOpen, onClose, funcion, onSuccess }: Fu
           .from('funciones')
           .insert([supabaseData]);
       }
-
-      console.log('Supabase result:', result);
-
       if (result.error) {
-        console.error('Supabase error:', result.error);
         setError(result.error.message);
+        setLoading(false);
         return;
       }
-
-      console.log('Function saved successfully:', result.data);
       onSuccess();
       onClose();
-    } catch (err) {
-      console.error('Error saving funcion:', err);
+    } catch {
       setError('Error inesperado al guardar la función');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: name === 'precio_entrada' || name === 'capacidad_total' ? Number(value) : value
-    }));
-  };
-
-  const handleObraSelect = (obraId: string | null, obraData: { nombre: string; descripcion: string | null }) => {
-    setSelectedObraId(obraId);
-    
-    if (obraId) {
-      setFormData(prev => ({
-        ...prev,
-        obra_id: obraId,
-        nombre: obraData.nombre,
-        descripcion: obraData.descripcion || ''
-      }));
     }
   };
 
@@ -203,7 +179,7 @@ export default function FuncionModal({ isOpen, onClose, funcion, onSuccess }: Fu
           <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 px-6 py-4">
             <div className="flex items-center justify-between">
               <h3 className="text-xl font-semibold text-white">
-                {isEditing ? 'Editar Función' : 'Nueva Función'}
+                {funcion?.id ? 'Editar Función' : 'Nueva Función'}
               </h3>
               <button
                 onClick={onClose}
@@ -217,7 +193,7 @@ export default function FuncionModal({ isOpen, onClose, funcion, onSuccess }: Fu
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="px-6 py-6">
+          <form onSubmit={handleSubmit(onSubmit)} className="px-6 py-6">
             {error && (
               <div className="mb-4 rounded-md bg-red-50 p-3">
                 <div className="text-sm text-red-700">{error}</div>
@@ -229,7 +205,7 @@ export default function FuncionModal({ isOpen, onClose, funcion, onSuccess }: Fu
               <ObraSelector
                 selectedObraId={selectedObraId}
                 onObraSelect={handleObraSelect}
-                isEditing={isEditing}
+                isEditing={!!funcion?.id}
                 error={fieldErrors.obra_id}
               />
 
@@ -241,18 +217,15 @@ export default function FuncionModal({ isOpen, onClose, funcion, onSuccess }: Fu
                 <input
                   type="text"
                   id="nombre"
-                  name="nombre"
-                  required
-                  value={formData.nombre}
-                  onChange={handleInputChange}
+                  {...register('nombre')}
                   className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm text-gray-900 ${
                     selectedObraId ? 'bg-gray-50' : 'bg-white'
                   }`}
                   placeholder="Ej: Romeo y Julieta"
                   readOnly={!!selectedObraId}
                 />
-                {fieldErrors.nombre && (
-                  <p className="mt-1 text-sm text-red-600">{fieldErrors.nombre}</p>
+                {errors.nombre && (
+                  <p className="mt-1 text-sm text-red-600">{errors.nombre.message}</p>
                 )}
               </div>
 
@@ -263,10 +236,8 @@ export default function FuncionModal({ isOpen, onClose, funcion, onSuccess }: Fu
                 </label>
                 <textarea
                   id="descripcion"
-                  name="descripcion"
+                  {...register('descripcion')}
                   rows={3}
-                  value={formData.descripcion || ''}
-                  onChange={handleInputChange}
                   className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm text-gray-900 ${
                     selectedObraId ? 'bg-gray-50' : 'bg-white'
                   }`}
@@ -283,18 +254,15 @@ export default function FuncionModal({ isOpen, onClose, funcion, onSuccess }: Fu
                 <input
                   type="datetime-local"
                   id="fecha"
-                  name="fecha"
-                  required
-                  value={formData.fecha}
-                  onChange={handleInputChange}
+                  {...register('fecha')}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm text-gray-900 bg-white"
                   step="900"
                 />
                 <p className="mt-1 text-xs text-gray-500">
                   Formato 24h: 15:30 (3:30 PM)
                 </p>
-                {fieldErrors.fecha && (
-                  <p className="mt-1 text-sm text-red-600">{fieldErrors.fecha}</p>
+                {errors.fecha && (
+                  <p className="mt-1 text-sm text-red-600">{errors.fecha.message}</p>
                 )}
               </div>
 
@@ -316,10 +284,7 @@ export default function FuncionModal({ isOpen, onClose, funcion, onSuccess }: Fu
                   </label>
                   <select
                     id="capacidad_total"
-                    name="capacidad_total"
-                    required
-                    value={formData.capacidad_total}
-                    onChange={handleInputChange}
+                    {...register('capacidad_total', { valueAsNumber: true })}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm text-gray-900 bg-white"
                   >
                     <option value="">Seleccionar capacidad</option>
@@ -334,8 +299,8 @@ export default function FuncionModal({ isOpen, onClose, funcion, onSuccess }: Fu
                     <option value="90">90 personas</option>
                     <option value="100">100 personas</option>
                   </select>
-                  {fieldErrors.capacidad_total && (
-                    <p className="mt-1 text-sm text-red-600">{fieldErrors.capacidad_total}</p>
+                  {errors.capacidad_total && (
+                    <p className="mt-1 text-sm text-red-600">{errors.capacidad_total.message}</p>
                   )}
                 </div>
                 <div>
@@ -349,17 +314,14 @@ export default function FuncionModal({ isOpen, onClose, funcion, onSuccess }: Fu
                     <input
                       type="text"
                       id="precio_entrada"
-                      name="precio_entrada"
-                      required
-                      value={formData.precio_entrada}
-                      onChange={handleInputChange}
+                      {...register('precio_entrada', { valueAsNumber: true })}
                       className="mt-1 block w-full pl-7 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm text-gray-900 bg-white"
                       placeholder="2500"
                       pattern="[0-9]*"
                       inputMode="numeric"
                     />
-                    {fieldErrors.precio_entrada && (
-                      <p className="mt-1 text-sm text-red-600">{fieldErrors.precio_entrada}</p>
+                    {errors.precio_entrada && (
+                      <p className="mt-1 text-sm text-red-600">{errors.precio_entrada.message}</p>
                     )}
                   </div>
                 </div>
@@ -372,9 +334,7 @@ export default function FuncionModal({ isOpen, onClose, funcion, onSuccess }: Fu
                 </label>
                 <select
                   id="estado"
-                  name="estado"
-                  value={formData.estado}
-                  onChange={handleInputChange}
+                  {...register('estado')}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm text-gray-900 bg-white"
                 >
                   <option value="ACTIVA">Activa</option>
@@ -404,7 +364,7 @@ export default function FuncionModal({ isOpen, onClose, funcion, onSuccess }: Fu
                     Guardando...
                   </div>
                 ) : (
-                  isEditing ? 'Actualizar' : 'Crear'
+                  funcion?.id ? 'Actualizar' : 'Crear'
                 )}
               </button>
             </div>
