@@ -8,6 +8,8 @@ import { z } from 'zod';
 import { TicketService } from '@/services/ticketService';
 import type { Invitado } from '@/types/invitados';
 import { useAuth } from '@/hooks/useAuth';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 
 // Esquema de validación para Invitado
 const invitadoSchema = z.object({
@@ -33,18 +35,6 @@ export default function InvitadoModal({ isOpen, onClose, invitado, onSuccess, fu
   const { profile } = useAuth();
   const [formLoading, setFormLoading] = useState(false);
   const [error, setError] = useState('');
-  const [formData, setFormData] = useState<InvitadoWithRelations>({
-    id: '',
-    funcion_id: funcionId || '',
-    colaborador_id: null,
-    nombre: '',
-    email: '',
-    telefono: '',
-    cantidad_tickets: 1,
-    created_at: '',
-    updated_at: '',
-  });
-
   const [selectedFuncionId, setSelectedFuncionId] = useState<string | null>(null);
   const [selectedFuncionData, setSelectedFuncionData] = useState<{ nombre: string; capacidad_total: number; precio_entrada: number; tickets_vendidos: number }>({
     nombre: '',
@@ -52,51 +42,72 @@ export default function InvitadoModal({ isOpen, onClose, invitado, onSuccess, fu
     precio_entrada: 0,
     tickets_vendidos: 0
   });
-
   const [colaboradores, setColaboradores] = useState<Array<{ id: string; nombre: string; email: string }>>([]);
   const [loadingColaboradores, setLoadingColaboradores] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState<{ [key: string]: string }>({});
 
   const isEditing = !!invitado?.id;
   const funcionSeleccionada = !!selectedFuncionId;
 
-  useEffect(() => {
-    if (isOpen) {
-      fetchColaboradores();
-    }
-  }, [isOpen]);
+  // RHF setup
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    formState: { errors, isSubmitting },
+    setError: setFormError,
+    clearErrors
+  } = useForm<{
+    funcion_id: string;
+    nombre: string;
+    email: string;
+    telefono?: string;
+    cantidad_tickets: number;
+    colaborador_id?: string | null;
+    created_at?: string;
+    updated_at?: string;
+  }>({
+    resolver: zodResolver(invitadoSchema),
+    defaultValues: {
+      funcion_id: funcionId || '',
+      nombre: '',
+      email: '',
+      telefono: '',
+      cantidad_tickets: 1,
+      colaborador_id: null,
+      created_at: undefined,
+      updated_at: undefined,
+    },
+    mode: 'onTouched',
+  });
 
+  // Sincronizar datos iniciales si se edita
   useEffect(() => {
     if (invitado) {
-      setFormData({
-        ...invitado,
-        email: invitado.email || '',
-        telefono: invitado.telefono || '',
-      });
+      setValue('funcion_id', invitado.funcion_id || '');
+      setValue('nombre', invitado.nombre || '');
+      setValue('email', invitado.email || '');
+      setValue('telefono', invitado.telefono || '');
+      setValue('cantidad_tickets', invitado.cantidad_tickets || 1);
+      setValue('colaborador_id', invitado.colaborador_id || null);
       setSelectedFuncionId(invitado.funcion_id || null);
       if (invitado.funciones && invitado.funciones[0]) {
         setSelectedFuncionData({
           nombre: invitado.funciones[0].nombre,
           capacidad_total: invitado.funciones[0].capacidad_total,
           precio_entrada: invitado.funciones[0].precio_entrada,
-          tickets_vendidos: 0 // Se calculará después
+          tickets_vendidos: 0
         });
       }
     } else {
-      setFormData({
-        id: '',
-        funcion_id: funcionId || '',
-        colaborador_id: null,
-        nombre: '',
-        email: '',
-        telefono: '',
-        cantidad_tickets: 1,
-        created_at: '',
-        updated_at: '',
-      });
+      setValue('funcion_id', funcionId || '');
+      setValue('nombre', '');
+      setValue('email', '');
+      setValue('telefono', '');
+      setValue('cantidad_tickets', 1);
+      setValue('colaborador_id', null);
       setSelectedFuncionId(funcionId || null);
       if (funcionId) {
-        // Fetch de la función para setear la capacidad real
         (async () => {
           const { data: funcionData, error } = await supabase
             .from('funciones')
@@ -129,17 +140,20 @@ export default function InvitadoModal({ isOpen, onClose, invitado, onSuccess, fu
       }
     }
     setError('');
-  }, [invitado, funcionId]);
+  }, [invitado, funcionId, setValue]);
 
   // Si el usuario es colaborador (no admin), autocompletar y bloquear el campo
   useEffect(() => {
     if (profile && profile.role === 'colaborador') {
-      setFormData(prev => ({
-        ...prev,
-        colaborador_id: profile.id
-      }));
+      setValue('colaborador_id', profile.id);
     }
-  }, [profile]);
+  }, [profile, setValue]);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchColaboradores();
+    }
+  }, [isOpen]);
 
   const fetchColaboradores = async () => {
     try {
@@ -189,183 +203,79 @@ export default function InvitadoModal({ isOpen, onClose, invitado, onSuccess, fu
       ...funcionData,
       tickets_vendidos: 0
     });
-
     if (funcionId) {
       const ticketsVendidos = await fetchFuncionStats(funcionId);
       setSelectedFuncionData(prev => ({
         ...prev,
         tickets_vendidos: ticketsVendidos
       }));
-
-      setFormData(prev => ({
-        ...prev,
-        funcion_id: funcionId
-      }));
+      setValue('funcion_id', funcionId);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit = async (data: { funcion_id: string; nombre: string; email: string; telefono?: string; cantidad_tickets: number; colaborador_id?: string | null; created_at?: string; updated_at?: string; }) => {
     setFormLoading(true);
     setError('');
-    setFieldErrors({});
-
     // Calcular variables de capacidad antes de la validación
     const capacidadDisponible = selectedFuncionData.capacidad_total - selectedFuncionData.tickets_vendidos;
     const ticketsActuales = isEditing ? (invitado?.cantidad_tickets || 0) : 0;
-
+    const maxTickets = capacidadDisponible + ticketsActuales;
+    if (data.cantidad_tickets > maxTickets) {
+      setFormError('cantidad_tickets', { type: 'manual', message: `Máximo disponible: ${maxTickets} tickets` });
+      setFormLoading(false);
+      return;
+    }
     try {
-      // Validar con Zod y mapear errores por campo
-      const maxTickets = capacidadDisponible + ticketsActuales;
-      const dynamicSchema = invitadoSchema.extend({
-        cantidad_tickets: z.number()
-          .int()
-          .min(1, 'Debe ser al menos 1')
-          .max(maxTickets, `Máximo disponible: ${maxTickets} tickets`)
-      });
-      const zodResult = dynamicSchema.safeParse({
-        ...formData,
-        cantidad_tickets: Number(formData.cantidad_tickets),
-      });
-      if (!zodResult.success) {
-        const newFieldErrors: { [key: string]: string } = {};
-        if (zodResult.error && Array.isArray(zodResult.error.issues)) {
-          zodResult.error.issues.forEach(err => {
-            if (err.path && err.path[0]) {
-              newFieldErrors[err.path[0].toString()] = err.message;
-            }
-          });
-        }
-        setFieldErrors(newFieldErrors);
-        setFormLoading(false);
-        return;
-      }
-      setFieldErrors({});
-
-      // Validar capacidad de la función
-      const ticketsNuevos = formData.cantidad_tickets - ticketsActuales;
-
-      if (ticketsNuevos > capacidadDisponible) {
-        setError(`No hay suficiente capacidad. Solo quedan ${capacidadDisponible} tickets disponibles.`);
-        setFormLoading(false);
-        return;
-      }
-
-      const invitadoData = {
-        ...formData,
-        cantidad_tickets: Number(formData.cantidad_tickets)
-      };
-      // Eliminar campos de fecha vacíos o undefined
-      if (!invitadoData.created_at) delete (invitadoData as { created_at?: string; updated_at?: string; id?: string }).created_at;
-      if (!invitadoData.updated_at) delete (invitadoData as { created_at?: string; updated_at?: string; id?: string }).updated_at;
-      // Eliminar id si está vacío o undefined para que la base lo genere
-      if (!invitadoData.id) delete (invitadoData as { created_at?: string; updated_at?: string; id?: string }).id;
-      // Convertir colaborador_id y funcion_id a null si son string vacío o undefined
-      if (invitadoData.colaborador_id === '' || invitadoData.colaborador_id === undefined) invitadoData.colaborador_id = null;
-      if (invitadoData.funcion_id === '') invitadoData.funcion_id = null;
-
       // Filtrar solo los campos válidos para la tabla 'invitados'
       const invitadoPayload: Omit<Invitado, 'id'> & Partial<Pick<Invitado, 'id'>> = {
-        funcion_id: invitadoData.funcion_id,
-        colaborador_id: invitadoData.colaborador_id,
-        nombre: invitadoData.nombre,
-        email: invitadoData.email,
-        telefono: invitadoData.telefono,
-        cantidad_tickets: invitadoData.cantidad_tickets,
-        created_at: invitadoData.created_at,
-        updated_at: invitadoData.updated_at,
+        funcion_id: data.funcion_id,
+        colaborador_id: data.colaborador_id,
+        nombre: data.nombre,
+        email: data.email,
+        telefono: data.telefono || '',
+        cantidad_tickets: data.cantidad_tickets,
       };
       if (isEditing && invitado?.id) {
         invitadoPayload.id = invitado.id;
       }
-
-      console.log('Data to send to Supabase:', invitadoPayload);
-
       let result;
       if (isEditing && invitado?.id) {
-        // Actualizar invitado existente
         result = await supabase
           .from('invitados')
           .update(invitadoPayload)
           .eq('id', invitado.id);
       } else {
-        // Crear nuevo invitado
         result = await supabase
           .from('invitados')
           .insert([invitadoPayload])
           .select();
       }
-
-      console.log('Supabase result:', result);
-
       if (result.error) {
-        console.error('Supabase error:', result.error);
         setError(result.error.message);
+        setFormLoading(false);
         return;
       }
-
-      console.log('Invitado saved successfully:', result.data);
-      
       // Generar tickets automáticamente si se creó exitosamente
       if (!isEditing && result.data && Array.isArray(result.data) && result.data.length > 0) {
         try {
           const invitadoId = result.data[0].id;
-          console.log('🔄 Generando tickets para invitado:', invitadoId);
-          console.log('📊 Cantidad de tickets:', formData.cantidad_tickets);
-          console.log('🎭 Función ID:', formData.funcion_id);
-          
-          if (formData.funcion_id) {
-            const tickets = await TicketService.createTicketsForInvitado(
+          if (data.funcion_id) {
+            await TicketService.createTicketsForInvitado(
               invitadoId,
-              formData.funcion_id,
-              formData.cantidad_tickets
+              data.funcion_id,
+              data.cantidad_tickets
             );
-            console.log('✅ Tickets generados exitosamente:', tickets.length, 'tickets');
-            
-            // Enviar email de invitación automáticamente
-            // Eliminar la función sendInvitationEmail
-            // Eliminar cualquier llamada a sendInvitationEmail en handleSubmit
-            // Eliminar manejo de error relacionado a email
-          } else {
-            console.warn('⚠️ No se puede generar tickets sin función seleccionada');
           }
-        } catch (ticketError) {
-          console.error('❌ Error generando tickets:', ticketError);
+        } catch {
           // No fallar el proceso si hay error en tickets, solo log
         }
-      } else if (!isEditing) {
-        console.warn('⚠️ No se pudieron obtener los datos del invitado creado para generar tickets');
       }
-      
       onSuccess();
       onClose();
-    } catch (err) {
-      console.error('Error saving invitado:', err);
+    } catch {
       setError('Error inesperado al guardar el invitado');
     } finally {
       setFormLoading(false);
-    }
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    
-    if (name === 'cantidad_tickets') {
-      const numericValue = parseInt(value) || 1;
-      setFormData(prev => ({
-        ...prev,
-        [name]: Math.max(1, numericValue)
-      }));
-    } else if (name === 'colaborador_id' || name === 'funcion_id') {
-      setFormData(prev => ({
-        ...prev,
-        [name]: value === '' ? null : value
-      }));
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        [name]: value
-      }));
     }
   };
 
@@ -373,7 +283,7 @@ export default function InvitadoModal({ isOpen, onClose, invitado, onSuccess, fu
 
   const capacidadDisponible = selectedFuncionData.capacidad_total - selectedFuncionData.tickets_vendidos;
   const ticketsActuales = isEditing ? (invitado?.cantidad_tickets || 0) : 0;
-  const ticketsNuevos = formData.cantidad_tickets - ticketsActuales;
+  const ticketsNuevos = watch('cantidad_tickets') - ticketsActuales;
   const capacidadSuficiente = ticketsNuevos <= capacidadDisponible;
 
   return (
@@ -402,7 +312,7 @@ export default function InvitadoModal({ isOpen, onClose, invitado, onSuccess, fu
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="px-6 py-6">
+          <form onSubmit={handleSubmit(onSubmit)} className="px-6 py-6">
             {error && (
               <div className="mb-4 rounded-md bg-red-50 p-3">
                 <div className="text-sm text-red-700">{error}</div>
@@ -442,15 +352,13 @@ export default function InvitadoModal({ isOpen, onClose, invitado, onSuccess, fu
                 <input
                   type="text"
                   id="nombre"
-                  name="nombre"
-                  value={formData.nombre}
-                  onChange={handleInputChange}
+                  {...register('nombre')}
                   className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm text-gray-900 bg-white ${!funcionSeleccionada ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}`}
                   placeholder="Ej: Juan Pérez"
                   disabled={!funcionSeleccionada}
                 />
-                {fieldErrors.nombre && (
-                  <p className="mt-1 text-sm text-red-600">{fieldErrors.nombre}</p>
+                {errors.nombre && (
+                  <p className="mt-1 text-sm text-red-600">{errors.nombre.message}</p>
                 )}
               </div>
 
@@ -462,15 +370,13 @@ export default function InvitadoModal({ isOpen, onClose, invitado, onSuccess, fu
                 <input
                   type="text"
                   id="email"
-                  name="email"
-                  value={formData.email || ''}
-                  onChange={handleInputChange}
+                  {...register('email')}
                   className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm text-gray-900 bg-white ${!funcionSeleccionada ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}`}
                   placeholder="juan@ejemplo.com"
                   disabled={!funcionSeleccionada}
                 />
-                {fieldErrors.email && (
-                  <p className="mt-1 text-sm text-red-600">{fieldErrors.email}</p>
+                {errors.email && (
+                  <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
                 )}
               </div>
 
@@ -482,9 +388,7 @@ export default function InvitadoModal({ isOpen, onClose, invitado, onSuccess, fu
                 <input
                   type="tel"
                   id="telefono"
-                  name="telefono"
-                  value={formData.telefono || ''}
-                  onChange={handleInputChange}
+                  {...register('telefono')}
                   className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm text-gray-900 bg-white ${!funcionSeleccionada ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}`}
                   placeholder="+54 9 11 1234-5678"
                   disabled={!funcionSeleccionada}
@@ -499,12 +403,10 @@ export default function InvitadoModal({ isOpen, onClose, invitado, onSuccess, fu
                 <input
                   type="number"
                   id="cantidad_tickets"
-                  name="cantidad_tickets"
+                  {...register('cantidad_tickets')}
                   required
                   min="1"
                   max={capacidadDisponible + ticketsActuales}
-                  value={formData.cantidad_tickets}
-                  onChange={handleInputChange}
                   className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm text-gray-900 bg-white ${!capacidadSuficiente ? 'border-red-300' : ''} ${!funcionSeleccionada ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}`}
                   disabled={!funcionSeleccionada}
                 />
@@ -519,8 +421,8 @@ export default function InvitadoModal({ isOpen, onClose, invitado, onSuccess, fu
                     Máximo disponible: {capacidadDisponible + ticketsActuales} tickets
                   </p>
                 )}
-                {fieldErrors.cantidad_tickets && (
-                  <p className="mt-1 text-sm text-red-600">{fieldErrors.cantidad_tickets}</p>
+                {errors.cantidad_tickets && (
+                  <p className="mt-1 text-sm text-red-600">{errors.cantidad_tickets.message}</p>
                 )}
               </div>
 
@@ -536,9 +438,7 @@ export default function InvitadoModal({ isOpen, onClose, invitado, onSuccess, fu
                 ) : (
                   <select
                     id="colaborador_id"
-                    name="colaborador_id"
-                    value={(formData.colaborador_id as string) || ''}
-                    onChange={handleInputChange}
+                    {...register('colaborador_id')}
                     className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm text-gray-900 bg-white ${!funcionSeleccionada ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : ''}`}
                     disabled={!funcionSeleccionada}
                   >
