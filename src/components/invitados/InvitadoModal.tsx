@@ -403,7 +403,7 @@ export default function InvitadoModal({ isOpen, onClose, invitado, onSuccess, fu
                 <input
                   type="number"
                   id="cantidad_tickets"
-                  {...register('cantidad_tickets')}
+                  {...register('cantidad_tickets', { valueAsNumber: true })}
                   required
                   min="1"
                   max={capacidadDisponible + ticketsActuales}
@@ -432,9 +432,12 @@ export default function InvitadoModal({ isOpen, onClose, invitado, onSuccess, fu
                   Colaborador (opcional)
                 </label>
                 {profile?.role === 'colaborador' ? (
-                  <div className="mt-1 text-gray-800 bg-gray-100 rounded px-3 py-2">
-                    {profile.full_name || ''} ({profile.email})
-                  </div>
+                  <>
+                    <input type="hidden" {...register('colaborador_id')} value={profile.id} />
+                    <div className="mt-1 text-gray-800 bg-gray-100 rounded px-3 py-2">
+                      {profile.full_name || ''} ({profile.email})
+                    </div>
+                  </>
                 ) : (
                   <select
                     id="colaborador_id"
