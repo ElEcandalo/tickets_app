@@ -1,79 +1,47 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import FuncionModal from './FuncionModal';
 import { Funcion } from '@/types/funciones';
+import useSWR from 'swr';
 
 export default function FuncionesList() {
-  const [funciones, setFunciones] = useState<Funcion[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedFuncion, setSelectedFuncion] = useState<Funcion | null>(null);
+  const [error, setError] = useState('');
 
-  useEffect(() => {
-    fetchFunciones();
-  }, []);
-
+  // Fetch funciones con SWR
   const fetchFunciones = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('funciones')
-        .select('id, obra_id, nombre, descripcion, fecha, ubicacion, capacidad_total, precio_entrada, estado, created_by, updated_at')
-        .order('fecha', { ascending: true });
-
-      if (error) {
-        setError(error.message);
-        return;
-      }
-
-      setFunciones((data || []).map((f: {
-        id: string;
-        obra_id: string;
-        nombre: string;
-        descripcion: string | null;
-        fecha: string;
-        ubicacion: string;
-        capacidad_total: number;
-        precio_entrada: number;
-        estado: string;
-        created_by: string | null;
-        updated_at: string;
-      }) => ({
-        ...f,
-        precio_entrada: Number(f.precio_entrada),
-        descripcion: f.descripcion || '',
-        created_by: f.created_by || '',
-        estado: f.estado as 'ACTIVA' | 'CANCELADA' | 'FINALIZADA',
-      })));
-    } catch (err) {
-      setError('Error al cargar las funciones');
-      console.error('Error fetching funciones:', err);
-    } finally {
-      setLoading(false);
-    }
+    const { data, error } = await supabase
+      .from('funciones')
+      .select('id, obra_id, nombre, descripcion, fecha, ubicacion, capacidad_total, precio_entrada, estado, created_by, updated_at')
+      .order('fecha', { ascending: true });
+    if (error) throw new Error(error.message);
+    return (data || []).map((f: Funcion) => ({
+      ...f,
+      precio_entrada: Number(f.precio_entrada),
+      descripcion: f.descripcion || '',
+      created_by: f.created_by || '',
+      estado: f.estado as 'ACTIVA' | 'CANCELADA' | 'FINALIZADA',
+    }));
   };
+  const { data: funciones = [], isLoading, mutate } = useSWR('funciones', fetchFunciones);
 
   const handleDelete = async (id: string) => {
     if (!confirm('¿Estás seguro de que quieres eliminar esta función?')) {
       return;
     }
-
     try {
       const { error } = await supabase
         .from('funciones')
         .delete()
         .eq('id', id);
-
       if (error) {
         setError(error.message);
         return;
       }
-
-      // Actualizar la lista
-      setFunciones(funciones.filter(f => f.id !== id));
+      mutate(); // Refrescar lista
     } catch (err) {
       setError('Error al eliminar la función');
       console.error('Error deleting funcion:', err);
@@ -91,7 +59,7 @@ export default function FuncionesList() {
   };
 
   const handleModalSuccess = () => {
-    fetchFunciones();
+    mutate();
   };
 
   const formatDate = (dateString: string) => {
@@ -118,7 +86,7 @@ export default function FuncionesList() {
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center py-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>

@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/hooks/useAuth';
 import { Obra } from '@/types/obras';
+import useSWR from 'swr';
 
 interface ObraSelectorProps {
   selectedObraId: string | null;
@@ -14,44 +15,20 @@ interface ObraSelectorProps {
 
 export default function ObraSelector({ selectedObraId, onObraSelect, isEditing, error }: ObraSelectorProps) {
   const { user } = useAuth();
-  const [obras, setObras] = useState<Obra[]>([]);
-  const [loading, setLoading] = useState(true);
   const [showNewObra, setShowNewObra] = useState(false);
   const [newObraNombre, setNewObraNombre] = useState('');
   const [newObraDescripcion, setNewObraDescripcion] = useState('');
 
-  useEffect(() => {
-    fetchObras();
-  }, []);
-
+  // Fetch obras con SWR
   const fetchObras = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('obras')
-        .select('id, nombre, descripcion, created_by')
-        .order('nombre', { ascending: true });
-
-      if (error) {
-        console.error('Error fetching obras:', error);
-        return;
-      }
-
-      setObras((data || []).map((obra: {
-        id: string;
-        nombre: string;
-        descripcion: string | null;
-        created_by: string | null;
-      }) => ({
-        ...obra,
-        created_by: obra.created_by || ''
-      })));
-    } catch (err) {
-      console.error('Error fetching obras:', err);
-    } finally {
-      setLoading(false);
-    }
+    const { data, error } = await supabase
+      .from('obras')
+      .select('id, nombre, descripcion, created_by')
+      .order('nombre', { ascending: true });
+    if (error) throw new Error(error.message);
+    return (data as Obra[]) || [];
   };
+  const { data: obras = [], isLoading, mutate } = useSWR('obras', fetchObras);
 
   const handleCreateObra = async () => {
     if (!newObraNombre.trim()) return;
@@ -59,7 +36,6 @@ export default function ObraSelector({ selectedObraId, onObraSelect, isEditing, 
       console.error('No user found');
       return;
     }
-
     try {
       const { data, error } = await supabase
         .from('obras')
@@ -70,19 +46,15 @@ export default function ObraSelector({ selectedObraId, onObraSelect, isEditing, 
         }])
         .select('id, nombre, descripcion, created_by')
         .single();
-
       if (error) {
         console.error('Error creating obra:', error);
         return;
       }
-
       if (!data) {
         console.error('No data returned from obra creation');
         return;
       }
-
-      setObras(prev => [...prev, { ...data, created_by: data.created_by || user.id }]);
-      // Selecciona automáticamente la nueva obra creada
+      mutate(); // Refrescar lista
       onObraSelect(data.id, {
         nombre: data.nombre,
         descripcion: data.descripcion
@@ -113,7 +85,7 @@ export default function ObraSelector({ selectedObraId, onObraSelect, isEditing, 
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Seleccionar Obra
         </label>
-        {loading ? (
+        {isLoading ? (
           <div className="flex items-center justify-center py-4">
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
           </div>

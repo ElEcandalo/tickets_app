@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import useSWR from 'swr';
 import { supabase } from '@/lib/supabaseClient';
 import { Funcion } from '@/types/funciones';
 
@@ -11,34 +11,17 @@ interface FuncionSelectorProps {
 }
 
 export default function FuncionSelector({ selectedFuncionId, onFuncionSelect, isEditing }: FuncionSelectorProps) {
-  const [funciones, setFunciones] = useState<Funcion[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchFunciones();
-  }, []);
-
+  // Fetch funciones con SWR
   const fetchFunciones = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('funciones')
-        .select('id, nombre, fecha, capacidad_total, precio_entrada, estado, obra_id')
-        .eq('estado', 'ACTIVA')
-        .order('fecha', { ascending: true });
-
-      if (error) {
-        console.error('Error fetching funciones:', error);
-        return;
-      }
-
-      setFunciones((data as Funcion[]) || []);
-    } catch (err) {
-      console.error('Error fetching funciones:', err);
-    } finally {
-      setLoading(false);
-    }
+    const { data, error } = await supabase
+      .from('funciones')
+      .select('id, nombre, fecha, capacidad_total, precio_entrada, estado, obra_id')
+      .eq('estado', 'ACTIVA')
+      .order('fecha', { ascending: true });
+    if (error) throw new Error(error.message);
+    return (data as Funcion[]) || [];
   };
+  const { data: funciones = [], isLoading } = useSWR('funciones-activas', fetchFunciones);
 
   const handleFuncionSelect = (funcionId: string) => {
     const funcion = funciones.find(f => f.id === funcionId);
@@ -69,7 +52,7 @@ export default function FuncionSelector({ selectedFuncionId, onFuncionSelect, is
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Seleccionar Función
         </label>
-        {loading ? (
+        {isLoading ? (
           <div className="flex items-center justify-center py-4">
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
           </div>
@@ -91,7 +74,7 @@ export default function FuncionSelector({ selectedFuncionId, onFuncionSelect, is
       </div>
 
       {/* Mensaje si no hay funciones activas */}
-      {!loading && funciones.length === 0 && (
+      {!isLoading && funciones.length === 0 && (
         <div className="text-center py-4">
           <p className="text-sm text-gray-500">No hay funciones activas disponibles</p>
         </div>
