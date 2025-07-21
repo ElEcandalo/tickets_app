@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
-import type { UserProfile, UserRole } from "@/types/user_profiles";
+import type { UserProfile } from "@/types/user_profiles";
 import Link from 'next/link';
 
 const ADMIN_EMAIL = "elescandalo.info@gmail.com";
@@ -69,28 +69,29 @@ export default function UsuariosAdminPage() {
     }
   };
 
-  const handleChangeRole = async (id: string, newRole: UserRole) => {
-    setActionLoading(id + newRole);
-    setError("");
-    try {
-      const { error } = await supabase
-        .from("user_profiles")
-        .update({ role: newRole })
-        .eq("id", id);
-      if (error) {
-        setError(error.message);
-        return;
-      }
-      setUsuarios((prev) =>
-        prev.map((u) => (u.id === id ? { ...u, role: newRole } : u))
-      );
-    } catch (err) {
-      setError("Error inesperado al cambiar rol");
-      console.error(err);
-    } finally {
-      setActionLoading(null);
-    }
-  };
+  // Eliminar o comentar la declaración de handleChangeRole si no se usa
+  // const handleChangeRole = async (id: string, newRole: UserRole) => {
+  //   setActionLoading(id + newRole);
+  //   setError("");
+  //   try {
+  //     const { error } = await supabase
+  //       .from("user_profiles")
+  //       .update({ role: newRole })
+  //       .eq("id", id);
+  //     if (error) {
+  //       setError(error.message);
+  //       return;
+  //     }
+  //     setUsuarios((prev) =>
+  //       prev.map((u) => (u.id === id ? { ...u, role: newRole } : u))
+  //     );
+  //   } catch (err) {
+  //     setError("Error inesperado al cambiar rol");
+  //     console.error(err);
+  //   } finally {
+  //     setActionLoading(null);
+  //   }
+  // };
 
   if (loading || fetching) {
     return (

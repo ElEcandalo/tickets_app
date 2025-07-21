@@ -30,7 +30,7 @@ interface InvitadoModalProps {
 }
 
 export default function InvitadoModal({ isOpen, onClose, invitado, onSuccess, funcionId }: InvitadoModalProps) {
-  const { user, profile, loading } = useAuth();
+  const { profile } = useAuth();
   const [formLoading, setFormLoading] = useState(false);
   const [error, setError] = useState('');
   const [formData, setFormData] = useState<InvitadoWithRelations>({

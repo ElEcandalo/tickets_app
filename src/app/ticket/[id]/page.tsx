@@ -5,11 +5,21 @@ import { QRCodeCanvas } from 'qrcode.react';
 import { useAuth } from '@/hooks/useAuth';
 import { useParams } from 'next/navigation';
 
+// Definir tipo TicketPageData para el estado ticket
+interface TicketPageData {
+  id: string;
+  usado: boolean;
+  invitado_id: string;
+  funcion_id: string;
+  invitados?: { nombre?: string; email?: string } | { nombre?: string; email?: string }[];
+  funciones?: { nombre?: string; fecha?: string; ubicacion?: string } | { nombre?: string; fecha?: string; ubicacion?: string }[];
+}
+
 export default function TicketPage() {
   const params = useParams();
   const ticketId = typeof params.id === 'string' ? params.id : params.id?.[0];
-  const { user, profile, loading } = useAuth();
-  const [ticket, setTicket] = useState<any>(null);
+  const { profile } = useAuth();
+  const [ticket, setTicket] = useState<TicketPageData | null>(null);
   const [error, setError] = useState('');
   const [validating, setValidating] = useState(false);
 
@@ -71,7 +81,7 @@ export default function TicketPage() {
         <button
           onClick={() => {
             const canvas = document.getElementById('ticket-qr-canvas')?.querySelector('canvas') || document.querySelector('#ticket-qr-canvas');
-            if (canvas && canvas.toDataURL) {
+            if (canvas && canvas instanceof HTMLCanvasElement) {
               const link = document.createElement('a');
               link.download = `ticket_qr_${ticketId}.png`;
               link.href = canvas.toDataURL('image/png');

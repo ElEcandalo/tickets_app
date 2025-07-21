@@ -2,12 +2,11 @@
 
 import { useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 
 export default function RegisterForm() {
-  const { register, handleSubmit, watch, formState: { errors, isSubmitting }, setError, clearErrors } = useForm<{ full_name: string; email: string; password: string; confirmPassword: string }>({
+  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<{ full_name: string; email: string; password: string; confirmPassword: string }>({
     mode: 'onTouched',
   });
   const [serverError, setServerError] = useState('');

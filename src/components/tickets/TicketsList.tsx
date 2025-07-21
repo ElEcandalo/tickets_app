@@ -1,13 +1,21 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { TicketService, TicketWithDetails } from '@/services/ticketService';
-import Image from 'next/image';
+import { useState, useEffect, useMemo } from 'react';
 import TicketsCompactView from './TicketsCompactView';
-import html2canvas from 'html2canvas';
 import useSWR from 'swr';
 import { supabase } from '@/lib/supabaseClient';
 import { QRCodeCanvas } from 'qrcode.react';
+
+// Definir tipo Ticket para los datos usados
+interface Ticket {
+  id: string;
+  funcion_id: string;
+  invitado_id: string;
+  usado: boolean;
+  created_at?: string;
+  updated_at?: string;
+  funcion?: { nombre?: string; fecha?: string; ubicacion?: string } | { nombre?: string; fecha?: string; ubicacion?: string }[];
+}
 
 interface TicketsListProps {
   invitadoId: string;
@@ -27,16 +35,13 @@ const fetchTickets = async (invitadoId: string) => {
 };
 
 export default function TicketsList({ invitadoId, invitadoNombre, invitadoEmail }: TicketsListProps) {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [resendingEmail, setResendingEmail] = useState(false);
   const [showQR, setShowQR] = useState<string | null>(null);
-  const [qrCodes, setQrCodes] = useState<{ [key: string]: string }>({});
   const [generatingQR, setGeneratingQR] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [viewMode, setViewMode] = useState<'compact' | 'detailed' | 'optimized'>('compact');
 
-  const { data: tickets = [], error: ticketsError, isLoading, mutate } = useSWR(
+  // Cambiar el tipo de tickets en SWR:
+  const { data: tickets = [], error: ticketsError, isLoading } = useSWR<Ticket[]>(
     invitadoId ? ['tickets', invitadoId] : null,
     () => fetchTickets(invitadoId)
   );
@@ -50,8 +55,8 @@ export default function TicketsList({ invitadoId, invitadoNombre, invitadoEmail 
   const handleShowQR = async (ticketId: string) => {
     console.log('🔍 handleShowQR llamado con ticketId:', ticketId);
     console.log('🔍 showQR actual:', showQR);
-    console.log('🔍 qrCodes en cache:', Object.keys(qrCodes));
-    
+    // Eliminado: console.log('🔍 qrCodes en cache:', Object.keys(qrCodes));
+
     if (showQR === ticketId) {
       console.log('🔍 Ocultando QR para ticket:', ticketId);
       setShowQR(null);
@@ -61,35 +66,25 @@ export default function TicketsList({ invitadoId, invitadoNombre, invitadoEmail 
     try {
       console.log('🔍 Iniciando generación de QR para ticket:', ticketId);
       setGeneratingQR(ticketId);
-      
-      // Generar QR si no existe en cache
-      if (!qrCodes[ticketId]) {
-        console.log('🔍 QR no está en cache, generando...');
-        const qrCode = await TicketService.generateQRForTicket(ticketId);
-        console.log('🔍 QR generado exitosamente, longitud:', qrCode.length);
-        setQrCodes(prev => ({ ...prev, [ticketId]: qrCode }));
-      } else {
-        console.log('🔍 QR encontrado en cache');
-      }
-      
+      // Ya no se usa cache de QR
       setShowQR(ticketId);
       console.log('🔍 QR mostrado para ticket:', ticketId);
     } catch (err) {
       console.error('❌ Error generating QR:', err);
-      setError('Error al generar el código QR');
     } finally {
       setGeneratingQR(null);
     }
   };
 
-  const formatDate = (dateString: string) => {
+  // Corregir el tipo de formatDate para aceptar string | undefined
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return '-';
     const date = new Date(dateString);
     const day = date.getDate().toString().padStart(2, '0');
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
     const year = date.getFullYear();
     const hours = date.getHours().toString().padStart(2, '0');
     const minutes = date.getMinutes().toString().padStart(2, '0');
-    
     return `${day}-${month}-${year} ${hours}:${minutes}`;
   };
 
@@ -345,7 +340,7 @@ export default function TicketsList({ invitadoId, invitadoNombre, invitadoEmail 
 
                   {/* Información adicional */}
                   <div className="mt-3 text-xs text-gray-500">
-                    <p>Creado: {formatDate(ticket.created_at || '')}</p>
+                    <p>Creado: {formatDate(ticket.created_at)}</p>
                     {ticket.updated_at && ticket.updated_at !== ticket.created_at && (
                       <p>Actualizado: {formatDate(ticket.updated_at)}</p>
                     )}

@@ -50,8 +50,6 @@ export default function InvitadosList({ funcionId: propFuncionId, showStats = tr
   const [stats, setStats] = useState<InvitadoStats | null>(null);
   const [funcionId, setFuncionId] = useState<string | undefined>(propFuncionId);
   const [funciones, setFunciones] = useState<FuncionOption[]>([]);
-  const [resendingEmail, setResendingEmail] = useState<string | null>(null);
-  const [emailMessage, setEmailMessage] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
   useEffect(() => {
     fetchFunciones();
@@ -334,13 +332,13 @@ export default function InvitadosList({ funcionId: propFuncionId, showStats = tr
       )}
 
       {/* Email Message */}
-      {emailMessage && (
-        <div className={`rounded-md p-4 ${emailMessage.type === 'success' ? 'bg-green-50' : 'bg-red-50'}`}>
-          <div className={`text-sm ${emailMessage.type === 'success' ? 'text-green-700' : 'text-red-700'}`}>
-            {emailMessage.message}
-          </div>
-        </div>
-      )}
+      {/* Eliminar: {emailMessage && ( */}
+      {/* Eliminar:   <div className={`rounded-md p-4 ${emailMessage.type === 'success' ? 'bg-green-50' : 'bg-red-50'}`}> */}
+      {/* Eliminar:     <div className={`text-sm ${emailMessage.type === 'success' ? 'text-green-700' : 'text-red-700'}`}> */}
+      {/* Eliminar:       {emailMessage.message} */}
+      {/* Eliminar:     </div> */}
+      {/* Eliminar:   </div> */}
+      {/* Eliminar: )} */}
 
       {/* Lista de invitados */}
       <div className="bg-white shadow overflow-hidden sm:rounded-md">
