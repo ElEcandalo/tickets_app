@@ -4,11 +4,10 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useForm } from 'react-hook-form';
 
 export default function ResetPassword() {
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [loading, setLoading] = useState(false);
+  const { register, handleSubmit, formState: { errors, isSubmitting }, watch } = useForm<{ password: string; confirmPassword: string }>({ mode: 'onTouched' });
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const router = useRouter();
@@ -21,51 +20,35 @@ export default function ResetPassword() {
         setError('Enlace inválido o expirado. Por favor solicita un nuevo enlace de recuperación.');
       }
     };
-
     checkSession();
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+  const onSubmit = async ({ password, confirmPassword }: { password: string; confirmPassword: string }) => {
     setError('');
     setMessage('');
-
     // Validar que las contraseñas coincidan
     if (password !== confirmPassword) {
       setError('Las contraseñas no coinciden');
-      setLoading(false);
       return;
     }
-
     // Validar longitud mínima
     if (password.length < 6) {
       setError('La contraseña debe tener al menos 6 caracteres');
-      setLoading(false);
       return;
     }
-
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: password
-      });
-
+      const { error } = await supabase.auth.updateUser({ password });
       if (error) {
         setError(error.message);
         return;
       }
-
       setMessage('Contraseña actualizada exitosamente. Redirigiendo al login...');
-      
-      // Redirigir al login después de 2 segundos
       setTimeout(() => {
         router.push('/login');
       }, 2000);
     } catch (err) {
       setError('Error inesperado al actualizar la contraseña');
       console.error('Error updating password:', err);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -86,19 +69,17 @@ export default function ResetPassword() {
           </p>
         </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
           {error && (
             <div className="rounded-md bg-red-50 p-4">
               <div className="text-sm text-red-700">{error}</div>
             </div>
           )}
-
           {message && (
             <div className="rounded-md bg-green-50 p-4">
               <div className="text-sm text-green-700">{message}</div>
             </div>
           )}
-
           <div className="space-y-4">
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
@@ -106,44 +87,46 @@ export default function ResetPassword() {
               </label>
               <input
                 id="password"
-                name="password"
                 type="password"
                 autoComplete="new-password"
+                minLength={6}
                 required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                {...register('password', {
+                  required: 'La contraseña es obligatoria',
+                  minLength: { value: 6, message: 'Mínimo 6 caracteres' }
+                })}
                 className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                 placeholder="Mínimo 6 caracteres"
-                minLength={6}
               />
+              {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>}
             </div>
-
             <div>
               <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
                 Confirmar Contraseña
               </label>
               <input
                 id="confirmPassword"
-                name="confirmPassword"
                 type="password"
                 autoComplete="new-password"
+                minLength={6}
                 required
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
+                {...register('confirmPassword', {
+                  required: 'Confirma tu contraseña',
+                  validate: value => value === watch('password') || 'Las contraseñas no coinciden'
+                })}
                 className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                 placeholder="Repite tu contraseña"
-                minLength={6}
               />
+              {errors.confirmPassword && <p className="mt-1 text-sm text-red-600">{errors.confirmPassword.message}</p>}
             </div>
           </div>
-
           <div>
             <button
               type="submit"
-              disabled={loading}
+              disabled={isSubmitting}
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? (
+              {isSubmitting ? (
                 <div className="flex items-center">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                   Actualizando...
@@ -153,7 +136,6 @@ export default function ResetPassword() {
               )}
             </button>
           </div>
-
           <div className="text-center">
             <Link
               href="/login"
