@@ -54,9 +54,8 @@ export default function InvitadoModal({ isOpen, onClose, invitado, onSuccess, fu
     handleSubmit,
     setValue,
     watch,
-    formState: { errors, isSubmitting },
-    setError: setFormError,
-    clearErrors
+    formState: { errors },
+    setError: setFormError
   } = useForm<{
     funcion_id: string;
     nombre: string;

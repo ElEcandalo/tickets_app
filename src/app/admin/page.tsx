@@ -6,17 +6,31 @@ import { useEffect, useState } from 'react';
 import FuncionesList from '@/components/funciones/FuncionesList';
 import InvitadosList from '@/components/invitados/InvitadosList';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 
-export default function AdminPage() {
+function AdminPageContent() {
   const { user, profile, loading, signOut } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<'funciones' | 'invitados' | 'validator'>('funciones');
+  const [selectedFuncionId, setSelectedFuncionId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     if (!loading && (!user || profile?.role !== 'admin')) {
       router.push('/login');
     }
   }, [user, profile, loading, router]);
+
+  // Manejar navegación por query params
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    const funcionId = searchParams.get('funcionId');
+    if (tab === 'invitados') {
+      setActiveTab('invitados');
+      setSelectedFuncionId(funcionId || undefined);
+    }
+  }, [searchParams]);
 
   if (loading) {
     return (
@@ -105,9 +119,17 @@ export default function AdminPage() {
 
           {/* Tab Content */}
           {activeTab === 'funciones' && <FuncionesList />}
-          {activeTab === 'invitados' && <InvitadosList />}
+          {activeTab === 'invitados' && <InvitadosList funcionId={selectedFuncionId} />}
         </div>
       </main>
     </div>
+  );
+}
+
+export default function AdminPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="text-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div><p className="mt-4 text-gray-600">Cargando panel...</p></div></div>}>
+      <AdminPageContent />
+    </Suspense>
   );
 } 

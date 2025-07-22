@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: error.message || 'Error eliminando usuario de Auth' }, { status: 500 });
     }
     return NextResponse.json({ success: true });
-  } catch (err) {
+  } catch {
     return NextResponse.json({ success: false, error: 'Error inesperado en el backend' }, { status: 500 });
   }
 } 

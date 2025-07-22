@@ -41,10 +41,8 @@ export default function FuncionModal({ isOpen, onClose, funcion, onSuccess }: Fu
     register,
     handleSubmit,
     setValue,
-    watch,
-    formState: { errors, isSubmitting },
-    setError: setFormError,
-    clearErrors
+    formState: { errors },
+    setError: setFormError
   } = useForm<{
     obra_id: string;
     nombre: string;

@@ -51,7 +51,7 @@ export default function RegisterForm() {
       if (signUpData.user) {
         await new Promise(resolve => setTimeout(resolve, 1000));
         try {
-          const { data: profileData, error: profileError } = await supabase.rpc(
+          const { error: profileError } = await supabase.rpc(
             'create_user_profile',
             {
               user_id: signUpData.user.id,
@@ -73,11 +73,11 @@ export default function RegisterForm() {
             }
           ]);
           setSuccessMessage('Registro exitoso. Revisa tu email para confirmar tu cuenta.');
-        } catch (err) {
+        } catch {
           setServerError('Error inesperado al crear el perfil de usuario');
         }
       }
-    } catch (err) {
+    } catch {
       setServerError('Error inesperado durante el registro');
     }
   };

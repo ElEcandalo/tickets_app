@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import InvitadoModal from './InvitadoModal';
 import TicketsList from '../tickets/TicketsList';
-import { Invitado, InvitadoWithRelations, InvitadoStats } from '@/types/invitados';
+import { Invitado, InvitadoWithRelations } from '@/types/invitados';
 import useSWR from 'swr';
 
 interface FuncionOption {
@@ -112,8 +112,8 @@ export default function InvitadosList({ funcionId: propFuncionId, showStats = tr
   // Reemplazar el cálculo de stats por useMemo
   const stats = useMemo(() => {
     if (!showStats) return null;
-    let totalInvitados = invitados.length;
-    let totalTickets = invitados.reduce((sum, invitado) => sum + Number(invitado.cantidad_tickets), 0);
+    const totalInvitados = invitados.length;
+    const totalTickets = invitados.reduce((sum, invitado) => sum + Number(invitado.cantidad_tickets), 0);
     let capacidadDisponible: number | null = null;
     let porcentajeOcupacion: number | null = null;
     let capacidadTotal: number | null = null;
