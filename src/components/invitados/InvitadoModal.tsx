@@ -266,8 +266,14 @@ export default function InvitadoModal({ isOpen, onClose, invitado, onSuccess, fu
               data.cantidad_tickets
             );
           }
+          // Agregar email a mailing_list si no existe
+          if (data.email) {
+            await supabase.from('mailing_list').upsert([
+              { email: data.email, nombre: data.nombre }
+            ], { onConflict: 'email' });
+          }
         } catch {
-          // No fallar el proceso si hay error en tickets, solo log
+          // No fallar el proceso si hay error en tickets o mailing_list, solo log
         }
       }
       onSuccess();

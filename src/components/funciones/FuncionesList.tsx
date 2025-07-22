@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabaseClient';
 import FuncionModal from './FuncionModal';
 import { Funcion } from '@/types/funciones';
 import useSWR from 'swr';
+import Link from 'next/link';
 
 export default function FuncionesList() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -126,8 +127,10 @@ export default function FuncionesList() {
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
-                        <p className="text-lg font-medium text-indigo-600 truncate">
-                          {funcion.nombre}
+                        <p className="text-lg font-medium text-indigo-600 truncate cursor-pointer hover:underline">
+                          <Link href={`/admin?tab=invitados&funcionId=${funcion.id}`} scroll={false}>
+                            {funcion.nombre}
+                          </Link>
                         </p>
                         <div className="ml-2 flex-shrink-0 flex">
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getEstadoColor(funcion.estado)}`}>

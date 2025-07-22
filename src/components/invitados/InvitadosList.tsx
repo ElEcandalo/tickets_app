@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import InvitadoModal from './InvitadoModal';
 import TicketsList from '../tickets/TicketsList';
@@ -53,7 +53,8 @@ export default function InvitadosList({ funcionId: propFuncionId, showStats = tr
   const [selectedInvitado, setSelectedInvitado] = useState<Invitado | null>(null);
   const [isTicketsModalOpen, setIsTicketsModalOpen] = useState(false);
   const [selectedInvitadoForTickets, setSelectedInvitadoForTickets] = useState<Invitado | null>(null);
-  const [stats, setStats] = useState<InvitadoStats | null>(null);
+  // Eliminar el estado y setStats
+  // const [stats, setStats] = useState<InvitadoStats | null>(null);
   const [funcionId, setFuncionId] = useState<string | undefined>(propFuncionId);
   const [funciones, setFunciones] = useState<FuncionOption[]>([]);
   const [error, setError] = useState('');
@@ -83,24 +84,6 @@ export default function InvitadosList({ funcionId: propFuncionId, showStats = tr
     return `${day} de ${month} ${year} ${hours}:${minutes} hs`;
   }
 
-  const calculateStats = useCallback((invitadosData: InvitadoWithRelations[], capacidad: number | null) => {
-    const totalInvitados = invitadosData.length;
-    const totalTickets = invitadosData.reduce((sum, invitado) => sum + Number(invitado.cantidad_tickets), 0);
-            const capacidadTotal = typeof capacidad === 'number' && !isNaN(capacidad) ? capacidad : null;
-    let capacidadDisponible: number | null = null;
-    let porcentajeOcupacion: number | null = null;
-    if (funcionId && capacidadTotal !== null && capacidadTotal > 0) {
-      capacidadDisponible = Math.max(0, capacidadTotal - totalTickets);
-      porcentajeOcupacion = Math.round((totalTickets / capacidadTotal) * 100);
-    }
-    setStats({
-      total_invitados: totalInvitados,
-      total_tickets: totalTickets,
-      capacidad_disponible: capacidadDisponible,
-      porcentaje_ocupacion: porcentajeOcupacion
-    });
-  }, [funcionId]);
-
   // Fetch invitados con SWR
   const fetchInvitados = async (funcionId?: string) => {
     let query = supabase
@@ -125,6 +108,30 @@ export default function InvitadosList({ funcionId: propFuncionId, showStats = tr
   };
   const { data: invitados = [], isLoading, mutate } = useSWR(['invitados', funcionId], () => fetchInvitados(funcionId));
 
+  // Mueve el useMemo aquí, después de invitados
+  // Reemplazar el cálculo de stats por useMemo
+  const stats = useMemo(() => {
+    if (!showStats) return null;
+    let totalInvitados = invitados.length;
+    let totalTickets = invitados.reduce((sum, invitado) => sum + Number(invitado.cantidad_tickets), 0);
+    let capacidadDisponible: number | null = null;
+    let porcentajeOcupacion: number | null = null;
+    let capacidadTotal: number | null = null;
+    if (funcionId && invitados.length > 0 && invitados[0].funciones && invitados[0].funciones[0]) {
+      capacidadTotal = Number(invitados[0].funciones[0].capacidad_total) || null;
+    }
+    if (funcionId && capacidadTotal !== null && capacidadTotal > 0) {
+      capacidadDisponible = Math.max(0, capacidadTotal - totalTickets);
+      porcentajeOcupacion = Math.round((totalTickets / capacidadTotal) * 100);
+    }
+    return {
+      total_invitados: totalInvitados,
+      total_tickets: totalTickets,
+      capacidad_disponible: capacidadDisponible,
+      porcentaje_ocupacion: porcentajeOcupacion
+    };
+  }, [invitados, funcionId, showStats]);
+
   // Calcular estadísticas si se solicita
   useEffect(() => {
     if (!showStats) return;
@@ -137,19 +144,19 @@ export default function InvitadosList({ funcionId: propFuncionId, showStats = tr
           .eq('id', funcionId)
           .single();
         if (!funcionError && funcionData) {
-          calculateStats([], funcionData.capacidad_total);
+          // calculateStats([], funcionData.capacidad_total); // This line is no longer needed
         } else {
-          calculateStats([], null);
+          // calculateStats([], null); // This line is no longer needed
         }
       })();
     } else {
       // Si hay invitados, usa la capacidad de la función del primer invitado
-      const capacidad = funcionId && invitados.length > 0 && invitados[0].funciones && invitados[0].funciones[0]
-        ? Number(invitados[0].funciones[0].capacidad_total) || null
-        : null;
-      calculateStats(invitados, capacidad);
+      // const capacidad = funcionId && invitados.length > 0 && invitados[0].funciones && invitados[0].funciones[0]
+      //   ? Number(invitados[0].funciones[0].capacidad_total) || null
+      //   : null;
+      // calculateStats(invitados, capacidad); // This line is no longer needed
     }
-  }, [invitados, funcionId, showStats, calculateStats]);
+  }, [invitados, funcionId, showStats]); // Removed calculateStats from dependency array
 
   // Eliminar loading de invitados, ahora es isLoading de SWR
 

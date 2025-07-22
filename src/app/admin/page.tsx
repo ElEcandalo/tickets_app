@@ -46,6 +46,14 @@ export default function AdminPage() {
               <span className="text-gray-700">
                 Bienvenido, {profile?.full_name || profile?.email}
               </span>
+              {profile?.email === 'elescandalo.info@gmail.com' && (
+                <Link
+                  href="/admin/mails"
+                  className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-md text-sm font-medium"
+                >
+                  Ver lista de mails
+                </Link>
+              )}
               <button
                 onClick={signOut}
                 className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium"
