@@ -1,9 +1,9 @@
 'use client';
 import { useParams } from 'next/navigation';
-import useSWR from 'swr';
+import useSWR, { mutate } from 'swr';
 import { supabase } from '@/lib/supabaseClient';
 import { QRCodeCanvas } from 'qrcode.react';
-import React from 'react';
+import React, { useState } from 'react';
 
 interface TicketPageData {
   id: string;
@@ -17,7 +17,7 @@ interface TicketPageData {
 const fetchTicket = async (id: string): Promise<TicketPageData | null> => {
   const { data, error } = await supabase
     .from('tickets')
-    .select('id, usado, invitado_id, funcion_id, invitados(nombre, email), funciones(nombre, fecha, ubicacion, imagen_url)')
+    .select('id, usado, invitado_id, funcion_id, invitados(nombre, email), funciones(nombre, fecha, ubicacion)')
     .eq('id', id)
     .single();
   if (error || !data) return null;
@@ -27,8 +27,23 @@ const fetchTicket = async (id: string): Promise<TicketPageData | null> => {
 export default function TicketPage() {
   const params = useParams();
   const ticketId = typeof params.id === 'string' ? params.id : Array.isArray(params.id) ? params.id[0] : '';
+  const [validating, setValidating] = useState(false);
 
   const { data: ticket, error, isLoading } = useSWR(ticketId ? ['ticket', ticketId] : null, () => fetchTicket(ticketId));
+
+  const handleValidateTicket = async () => {
+    setValidating(true);
+    const { error } = await supabase
+      .from('tickets')
+      .update({ usado: true })
+      .eq('id', ticketId);
+    setValidating(false);
+    if (!error) {
+      mutate(['ticket', ticketId]);
+    } else {
+      alert('Error al validar el ticket');
+    }
+  };
 
   if (!ticketId) {
     return <div className="p-8 text-center text-red-600">ID de ticket inválido o no especificado.</div>;
@@ -75,6 +90,15 @@ export default function TicketPage() {
         <div className="mb-1 text-base text-gray-800 text-center">Lugar: <span className="font-semibold">{funcion?.ubicacion}</span></div>
         <div className="mb-1 text-base text-gray-800 text-center">Estado: {ticket.usado ? <span className="text-red-600 font-bold">USADO</span> : <span className="text-green-600 font-bold">VÁLIDO</span>}</div>
       </div>
+      {!ticket.usado && (
+        <button
+          onClick={handleValidateTicket}
+          disabled={validating}
+          className="bg-green-600 text-white px-4 py-2 rounded w-full mb-4 font-semibold text-lg"
+        >
+          {validating ? 'Validando...' : 'Validar ticket'}
+        </button>
+      )}
       <div className="mt-6 text-center">
         <a href={`https://wa.me/?text=${encodeURIComponent('Te comparto tu invitación: ' + ticketUrl)}`} target="_blank" rel="noopener noreferrer" className="text-green-700 underline font-medium">Compartir por WhatsApp</a>
       </div>

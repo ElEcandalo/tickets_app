@@ -79,6 +79,16 @@ function AdminPageContent() {
         </div>
       </header>
 
+      {/* Botón de impresión de invitados */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+        <Link
+          href="/admin/invitados-extracto"
+          className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded font-semibold inline-block"
+        >
+          Ir a impresión de invitados
+        </Link>
+      </div>
+
       {/* Main Content */}
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
