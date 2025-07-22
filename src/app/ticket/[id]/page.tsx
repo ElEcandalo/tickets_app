@@ -78,6 +78,9 @@ export default function TicketPage() {
       <div className="mt-6 text-center">
         <a href={`https://wa.me/?text=${encodeURIComponent('Te comparto tu invitación: ' + ticketUrl)}`} target="_blank" rel="noopener noreferrer" className="text-green-700 underline font-medium">Compartir por WhatsApp</a>
       </div>
+      <div className="mt-4 text-center">
+        <a href="/admin/invitados-extracto" className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded font-semibold inline-block">Ir a impresión de invitados</a>
+      </div>
     </div>
   );
 }
