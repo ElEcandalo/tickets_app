@@ -28,20 +28,25 @@ export default function TicketPage() {
   const params = useParams();
   const ticketId = typeof params.id === 'string' ? params.id : Array.isArray(params.id) ? params.id[0] : '';
   const [validating, setValidating] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
 
   const { data: ticket, error, isLoading } = useSWR(ticketId ? ['ticket', ticketId] : null, () => fetchTicket(ticketId));
 
   const handleValidateTicket = async () => {
     setValidating(true);
+    setSuccessMsg('');
+    setErrorMsg('');
     const { error } = await supabase
       .from('tickets')
       .update({ usado: true })
       .eq('id', ticketId);
     setValidating(false);
     if (!error) {
+      setSuccessMsg('¡Ticket validado correctamente!');
       mutate(['ticket', ticketId]);
     } else {
-      alert('Error al validar el ticket');
+      setErrorMsg('Error al validar el ticket. Intenta nuevamente.');
     }
   };
 
@@ -90,11 +95,17 @@ export default function TicketPage() {
         <div className="mb-1 text-base text-gray-800 text-center">Lugar: <span className="font-semibold">{funcion?.ubicacion}</span></div>
         <div className="mb-1 text-base text-gray-800 text-center">Estado: {ticket.usado ? <span className="text-red-600 font-bold">USADO</span> : <span className="text-green-600 font-bold">VÁLIDO</span>}</div>
       </div>
+      {successMsg && (
+        <div className="mb-4 rounded-md bg-green-50 p-3 text-green-700 text-center font-semibold">{successMsg}</div>
+      )}
+      {errorMsg && (
+        <div className="mb-4 rounded-md bg-red-50 p-3 text-red-700 text-center font-semibold">{errorMsg}</div>
+      )}
       {!ticket.usado && (
         <button
           onClick={handleValidateTicket}
-          disabled={validating}
-          className="bg-green-600 text-white px-4 py-2 rounded w-full mb-4 font-semibold text-lg"
+          disabled={validating || ticket.usado}
+          className="bg-green-600 text-white px-4 py-2 rounded w-full mb-4 font-semibold text-lg disabled:opacity-60"
         >
           {validating ? 'Validando...' : 'Validar ticket'}
         </button>
